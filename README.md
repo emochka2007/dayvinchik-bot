@@ -1,11 +1,22 @@
-# Teleterm Chat
+- Roadmap
+    - TDlib setup
+    - Interact through TDLib
+    - Send message to GPT with prompt and image and profile description
+    - Get the answer from GPT and log everything
+    - Actors and communication.
+- Entities
+    - Actors. The behaviour of the actor depends on the chosen.
+      Likes and dislikes also depends on the actor
+      Each of the actors has different prompt, different behaviour
+      - Like/Communicate actor
+      - Custom actors for users
+    - Stats.
+        - Log each profile. Photo + name. assign to it `PROFILE_ID`  `uuid`
+        - Save matches
+        - Log each response from GPT and assign to `PROFILE_ID`
+        - save each dialogue in a separate file
 
-Teleterm Chat lets you reply specific chats from your [telegram](https://telegram.org/) on the terminal with just a single command.
-
-```sh
-johndoe "Hey John, what have you been up to?"
-```
-
-## NOTE
-
-Follow along my journey of building this app at [my blog](https://darricheng.com/series/teleterm-chat/)!
+-- features --
+- analyze ignored chats (no answer for more than 24 hrs)
+- analyze any new message
+- multiple variants to start (love ur style, nyashka, wanna go for a walk) conside
