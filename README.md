@@ -1,8 +1,10 @@
 - Roadmap
     - TDlib setup
     - Interact through TDLib
-    - Send message to GPT with prompt and image and profile description
-    - Get the answer from GPT and log everything
+    - ## not implemented yet
+    - Get description of the profile and construct a "special_message" using LLM
+    - Send message to LLM with prompt and image and profile description
+    - Get the answer from LLM and log everything
     - Actors and communication.
 - Entities
     - Actors. The behaviour of the actor depends on the chosen.
