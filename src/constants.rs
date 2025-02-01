@@ -1,0 +1,1 @@
+pub const VINCHIK_CHAT:i64=1234060895;
