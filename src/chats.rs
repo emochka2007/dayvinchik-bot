@@ -23,7 +23,8 @@ pub fn get_public_chats(client_id: ClientId) {
     send(client_id, &message);
 }
 pub fn get_chat_history(client_id: ClientId, chat_id: i64) {
-    let message = GetChatHistory::builder().chat_id(chat_id).limit(2).build();
+    let message = GetChatHistory::builder().chat_id(chat_id)
+        .limit(2).build();
     let chat_history_msg = serde_json::to_string(&message).unwrap();
     send(client_id, &chat_history_msg)
 }

@@ -6,6 +6,13 @@ mod file;
 mod input;
 mod constants;
 mod td_file;
+mod llm_api;
+mod prompts;
+mod my_profile;
+mod openai;
+mod start_phrases;
+mod errors;
+mod superlike;
 
 use image::Luma;
 use serde::Serialize;
@@ -41,7 +48,7 @@ struct TDLibParams {
 
 #[tokio::main]
 async fn main() {
-    set_log_verbosity_level(1);
+    set_log_verbosity_level(0);
     dotenvy::dotenv().unwrap();
 
     let client_id = new_client();
@@ -109,7 +116,7 @@ async fn main() {
     // loop to keep getting json input for send() from developer
     loop {
         let input = input().unwrap();
-        match_input(input, client_id);
+        match_input(input, client_id).await;
         tokio::time::sleep(Duration::new(1, 0)).await;
     }
 }
@@ -142,6 +149,7 @@ fn parse_message(json_str: &str) {
         let msg_content: MessageContent = last_message.unwrap().content().clone();
         let path_to_append = "profile.log";
         match msg_content {
+            // If video just send only caption
             MessageContent::MessageVideo(content) => {
                 let text = content.caption().text();
                 println!("147 {text}");

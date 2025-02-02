@@ -1,7 +1,6 @@
 .idea
 qr_code.png
 *.log
-*.json
 /target
 .env*
 

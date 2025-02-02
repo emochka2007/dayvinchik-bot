@@ -1,3 +1,7 @@
+### Current implementation
+- OpenAi analyzes photo and creates a superlike message
+- multiple variants to start (love ur style, nyashka, wanna go for a walk) conside
+
 - Roadmap
     - TDlib setup
     - Interact through TDLib
@@ -6,6 +10,7 @@
     - Send message to LLM with prompt and image and profile description
     - Get the answer from LLM and log everything
     - Actors and communication.
+    - Filters (looking for friends => skip)
 - Entities
     - Actors. The behaviour of the actor depends on the chosen.
       Likes and dislikes also depends on the actor
@@ -19,6 +24,7 @@
         - save each dialogue in a separate file
 
 -- features --
+- Random timestamp between answers
+- Goals and checks in chat, getting info about girl (name, age, activity, favourite animal)
 - analyze ignored chats (no answer for more than 24 hrs)
 - analyze any new message
-- multiple variants to start (love ur style, nyashka, wanna go for a walk) conside

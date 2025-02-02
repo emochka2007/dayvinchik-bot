@@ -1,9 +1,7 @@
-use std::fmt::format;
+use std::error::Error;
 use std::fs::{File, OpenOptions};
-use std::io::Write;
-
-type Result = std::io::Result<()>;
-// type FileLog<'a> = Cow<'a, str>;
+use std::io::{Read, Write};
+use serde::Deserialize;
 
 pub fn file_log(data: String){
     let mut write_context = File::create("teleterm.json").unwrap();
@@ -11,7 +9,7 @@ pub fn file_log(data: String){
         .write_all(data.as_bytes())
         .unwrap();
 }
-pub fn log_append(data: String, path: &str) -> Result {
+pub fn log_append(data: String, path: &str) -> std::io::Result<()> {
     let data = format!("{data}\n");
     let mut file = OpenOptions::new()
         .write(true)
@@ -20,4 +18,11 @@ pub fn log_append(data: String, path: &str) -> Result {
 
     file.write_all(data.as_bytes())?;
     Ok(())
+}
+
+pub fn read_json_file (path: &str) -> std::io::Result<String> {
+    let mut file = File::open(path)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+    Ok(contents)
 }
