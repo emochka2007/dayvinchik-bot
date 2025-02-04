@@ -6,7 +6,7 @@ use reqwest::Client;
 use rust_tdlib::types::Chat;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
-use crate::openai::ChatCompletionResponse;
+use crate::openapi::openai::ChatCompletionResponse;
 use crate::prompts::Prompt;
 
 type OpenAIError = Box<dyn Error>;
@@ -16,7 +16,7 @@ pub struct OpenAI {
     base_url: String,
 }
 impl OpenAI {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         let client = Client::new();
         let base_url = "https://api.openai.com/v1/chat/".to_string();
         Self {

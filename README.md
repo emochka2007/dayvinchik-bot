@@ -1,4 +1,6 @@
 ### Current implementation
+- Detect unread messages
+- iterate over cities with one account.
 - OpenAi analyzes photo and creates a superlike message
 - multiple variants to start (love ur style, nyashka, wanna go for a walk) conside
 

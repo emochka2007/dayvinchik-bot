@@ -1,7 +1,6 @@
-use rust_tdlib::types::{GetChatHistory, GetChats};
+use rust_tdlib::types::{GetChat, GetChatHistory, GetChats};
 use serde::{Deserialize, Serialize};
-use crate::constants::VINCHIK_CHAT;
-use crate::tdjson::{send, ClientId};
+use crate::td::tdjson::{send, ClientId};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct Chats {
@@ -22,9 +21,14 @@ pub fn get_public_chats(client_id: ClientId) {
     let message = serde_json::to_string(&publicChats).unwrap();
     send(client_id, &message);
 }
-pub fn get_chat_history(client_id: ClientId, chat_id: i64) {
+pub fn get_messages(client_id: ClientId, chat_id: i64, limit: i32) {
     let message = GetChatHistory::builder().chat_id(chat_id)
-        .limit(2).build();
+        .limit(limit).build();
+    let chat_history_msg = serde_json::to_string(&message).unwrap();
+    send(client_id, &chat_history_msg)
+}
+pub fn get_chat_info(client_id: ClientId, chat_id: i64) {
+    let message = GetChat::builder().chat_id(chat_id).build();
     let chat_history_msg = serde_json::to_string(&message).unwrap();
     send(client_id, &chat_history_msg)
 }
