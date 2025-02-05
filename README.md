@@ -1,5 +1,5 @@
 ### Current implementation
-- Detect unread messages
+- list all active matches and check if the messages have been sent out
 - iterate over cities with one account.
 - OpenAi analyzes photo and creates a superlike message
 - multiple variants to start (love ur style, nyashka, wanna go for a walk) conside
@@ -29,4 +29,7 @@
 - Random timestamp between answers
 - Goals and checks in chat, getting info about girl (name, age, activity, favourite animal)
 - analyze ignored chats (no answer for more than 24 hrs)
-- analyze any new message
+
+## Done
+- Detect unread messages
+- Get the match message

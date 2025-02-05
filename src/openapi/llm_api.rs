@@ -36,8 +36,8 @@ impl OpenAI {
         Ok(response.json::<T>().await?)
     }
 
-    pub async fn profile_check(&self, profile_description: String) -> Result<String, OpenAIError> {
-        let prompt = Prompt::profile_review();
+    pub async fn generate_response(&self, message: String) -> Result<String, OpenAIError> {
+        let prompt = Prompt::main(&message);
         let content = prompt.user;
         let body = json!({
         "model": "gpt-4o",

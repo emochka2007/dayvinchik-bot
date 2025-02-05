@@ -25,10 +25,10 @@ pub struct FormattedText {
 
 //todo implement serialize
 impl SendMessage {
-    pub fn like() -> Self {
+    pub fn like(chat_id: &str) -> Self {
         let message = SendMessage {
             t: "sendMessage".to_string(),
-            chat_id: "1234060895".to_string(),
+            chat_id: chat_id.to_string(),
             input_message_content: InputMessageContent {
                 t: "inputMessageText".to_string(),
                 text: FormattedText {
@@ -39,10 +39,10 @@ impl SendMessage {
         };
         message
     }
-    pub fn super_like() -> Self {
+    pub fn super_like(chat_id: &str) -> Self {
         let message = SendMessage {
             t: "sendMessage".to_string(),
-            chat_id: "1234060895".to_string(),
+            chat_id: chat_id.to_string(),
             input_message_content: InputMessageContent {
                 t: "inputMessageText".to_string(),
                 text: FormattedText {
@@ -53,10 +53,10 @@ impl SendMessage {
         };
         message
     }
-    pub fn text_message(text: &str) -> Self {
+    pub fn text_message(text: &str, chat_id: &str) -> Self {
         let message = SendMessage {
             t: "sendMessage".to_string(),
-            chat_id: "1234060895".to_string(),
+            chat_id: chat_id.to_string(),
             input_message_content: InputMessageContent {
                 t: "inputMessageText".to_string(),
                 text: FormattedText {

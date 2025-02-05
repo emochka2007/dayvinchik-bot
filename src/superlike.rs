@@ -17,4 +17,7 @@ impl SuperLike {
         println!("{:?}", json_content);
         Ok(superlikes)
     }
+    pub fn cute(&self) -> &String {
+        &self.cute
+    }
 }

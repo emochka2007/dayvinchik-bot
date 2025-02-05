@@ -1,16 +1,23 @@
-use rust_tdlib::types::{GetChat, GetChatHistory, GetChats};
-use serde::{Deserialize, Serialize};
+use rust_tdlib::types::{Chats, GetChat, GetChatHistory, GetChats};
+use crate::constants::get_last_message;
+use crate::td::td_message::MessageMeta;
 use crate::td::tdjson::{send, ClientId};
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct Chats {
-    #[serde(rename(serialize = "@type", deserialize = "@type"))]
-    td_type: String,
-    total_count: i32,
-    chat_ids: Vec<i32>,
-    #[serde(rename(serialize = "@extra", deserialize = "@extra"))]
-    extra: String,
-    client_id: String,
+
+pub struct ChatMeta  {
+    chat_id: i64,
+    last_message: MessageMeta,
+}
+impl ChatMeta {
+    pub fn new(chat_id: i64, last_message: MessageMeta) -> Self {
+        Self {
+            chat_id,
+            last_message
+        }
+    }
+    pub fn last_message_text(&self) -> &String {
+        &self.last_message.text()
+    }
 }
 
 pub fn parse_chats(chats_json: String) -> Chats {
@@ -22,13 +29,27 @@ pub fn get_public_chats(client_id: ClientId) {
     send(client_id, &message);
 }
 pub fn get_messages(client_id: ClientId, chat_id: i64, limit: i32) {
-    let message = GetChatHistory::builder().chat_id(chat_id)
-        .limit(limit).build();
-    let chat_history_msg = serde_json::to_string(&message).unwrap();
-    send(client_id, &chat_history_msg)
+    let last_msg_id = get_last_message();
+        let message = GetChatHistory::builder()
+            .chat_id(chat_id)
+            .from_message_id(last_msg_id)
+            // .offset(i * -1)
+            .limit(limit).build();
+        let chat_history_msg = serde_json::to_string(&message).unwrap();
+        log::debug!("{chat_history_msg}");
+        send(client_id, &chat_history_msg)
 }
 pub fn get_chat_info(client_id: ClientId, chat_id: i64) {
     let message = GetChat::builder().chat_id(chat_id).build();
     let chat_history_msg = serde_json::to_string(&message).unwrap();
     send(client_id, &chat_history_msg)
+}
+
+//return none if not match and link if it does
+pub fn identify_match(text: &str) -> std::io::Result<String> {
+    let match_to_contain = "Есть взаимная симпатия!";
+    // if text.contains(match_to_contain) {
+    //
+    // }
+    Ok(match_to_contain.to_string())
 }
