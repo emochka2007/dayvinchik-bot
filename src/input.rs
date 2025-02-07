@@ -4,6 +4,7 @@ use rust_tdlib::types::Chat;
 use rust_tdlib::types::LoginUrlInfo::Open;
 use crate::chats::{get_messages, get_public_chats};
 use crate::constants::VINCHIK_CHAT;
+use crate::entities::profile_match::ProfileMatches;
 use crate::message::{CustomGetMe, SendMessage};
 use crate::openapi::llm_api::OpenAI;
 use crate::superlike::SuperLike;

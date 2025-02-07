@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct MyProfile {
     name: String,
     age: i16

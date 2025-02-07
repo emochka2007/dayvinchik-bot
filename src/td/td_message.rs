@@ -1,6 +1,4 @@
-use log::{error, info};
 use rust_tdlib::types::{Message, MessageContent, TextEntity, TextEntityType, TextEntityTypeTextUrl, TextEntityTypeUrl};
-use crate::file::log_append;
 
 #[derive(Debug)]
 pub struct MessageMeta {
@@ -30,8 +28,16 @@ impl MessageMeta {
             url: parsed_content.url,
         }
     }
+    pub fn is_match(&self) -> bool {
+        //todo take from config
+        let match_string = "Есть взаимная симпатия!";
+        self.text.contains(match_string)
+    }
     pub fn id(&self) -> &i64 {
         &self.id
+    }
+    pub fn url(&self) -> &Option<String> {
+        &self.url
     }
     pub fn is_read(&self) -> &bool {
         &self.is_read

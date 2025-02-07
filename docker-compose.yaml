@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: dayvinchik
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: dayvinchik
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5435"
+volumes:
+  postgres_data:

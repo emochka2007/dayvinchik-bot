@@ -1,8 +1,11 @@
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use rust_tdlib::types::{Chats, GetChat, GetChatHistory, GetChats};
 use crate::constants::get_last_message;
 use crate::td::td_message::MessageMeta;
 use crate::td::tdjson::{send, ClientId};
 
+pub type UnreadChats = Arc<Mutex<HashMap<i64, ChatMeta>>>;
 
 pub struct ChatMeta  {
     chat_id: i64,

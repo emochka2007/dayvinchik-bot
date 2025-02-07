@@ -1,12 +1,13 @@
 use rust_tdlib::types::{Chat, Chats, Messages};
 use serde_json::Value;
 use crate::chats::{get_chat_info, get_messages, ChatMeta};
+use crate::entities::profile_match::{ProfileMatch, ProfileMatches};
 use crate::file::{file_log, log_append};
 use crate::td::td_message::{match_message_content, MessageMeta};
 use crate::td::tdjson::ClientId;
 use crate::UnreadChats;
 
-pub fn parse_message(json_str: &str, client_id: ClientId, mut unread_chats: &UnreadChats) -> std::io::Result<()> {
+pub fn parse_message(json_str: &str, client_id: ClientId, mut unread_chats: &UnreadChats, mut profile_matches: &ProfileMatches) -> std::io::Result<()> {
     let parsed: Value = serde_json::from_str(json_str)?;
     // Extract the link
     if parsed["authorization_state"].is_string() {
@@ -28,6 +29,13 @@ pub fn parse_message(json_str: &str, client_id: ClientId, mut unread_chats: &Unr
         for message in messages.messages() {
             let message = message.as_ref().unwrap();
             let parsed_message = MessageMeta::from_message(message, None);
+            if parsed_message.is_match() {
+                let profile_match = ProfileMatch {
+                    url: parsed_message.url().as_ref().unwrap().to_string(),
+                    full_text: parsed_message.text().to_string()
+                };
+                profile_matches.lock().unwrap().push(profile_match);
+            }
         }
     } else if parsed["@type"] == "chat" {
         let chat: Chat = serde_json::from_value(parsed)?;
