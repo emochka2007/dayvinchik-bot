@@ -1,52 +1,87 @@
-use rust_tdlib::types::{Chat, Chats, Messages};
+use std::fmt::format;
+use log::{debug, error, info};
+use rust_tdlib::types::{Chat, Chats, Messages, SearchPublicChat, UpdateFile};
 use serde_json::Value;
-use crate::chats::{get_chat_info, get_messages, ChatMeta};
-use crate::entities::profile_match::{ProfileMatch, ProfileMatches};
-use crate::file::{file_log, log_append};
+use tokio_postgres::Client;
+use uuid::Uuid;
+use crate::chats::{td_chat_info, td_chat_history, ChatMeta};
+use crate::constants::{get_last_tdlib_call, update_last_message};
+use crate::entities::profile_match::{ProfileMatch};
+use crate::file::{file_log, log_append, move_file};
 use crate::td::td_message::{match_message_content, MessageMeta};
 use crate::td::tdjson::ClientId;
 use crate::UnreadChats;
 
-pub fn parse_message(json_str: &str, client_id: ClientId, mut unread_chats: &UnreadChats, mut profile_matches: &ProfileMatches) -> std::io::Result<()> {
+pub async fn parse_message(json_str: &str, client_id: ClientId, pg_client: &Client) -> std::io::Result<()> {
     let parsed: Value = serde_json::from_str(json_str)?;
-    // Extract the link
-    if parsed["authorization_state"].is_string() {
-        let link = parsed["authorization_state"]["link"].as_str();
-        // println!("✅ Extracted Telegram Link: {}", link);
-        // generate_qr_code(link);
-    } else if parsed["chat_ids"].is_array() {
-        let chats: Chats = serde_json::from_value(parsed)?;
-        let chats_list = chats.chat_ids();
-        for chat in chats_list {
-            let chat_info = get_chat_info(client_id, *chat);
-            get_messages(client_id, *chat, 1);
-        }
-        file_log(serde_json::to_string(&chats)?);
-    } else if parsed["@type"] == "messages" {
-        let messages: Messages = serde_json::from_value(parsed)?;
-        // log::debug!("{:?}", messages);
-        // log::info!("{}", json_str);
-        for message in messages.messages() {
-            let message = message.as_ref().unwrap();
-            let parsed_message = MessageMeta::from_message(message, None);
-            if parsed_message.is_match() {
-                let profile_match = ProfileMatch {
-                    url: parsed_message.url().as_ref().unwrap().to_string(),
-                    full_text: parsed_message.text().to_string()
-                };
-                profile_matches.lock().unwrap().push(profile_match);
+    let last_tdlib_call = get_last_tdlib_call();
+    match last_tdlib_call.as_str() {
+        // "GetChats" => {
+        //     let chats: Chats = serde_json::from_value(parsed)?;
+        //     let chats_list = chats.chat_ids();
+        //     for chat in chats_list {
+        //         let chat_info = td_chat_info(client_id, *chat);
+        //         td_chat_history(client_id, *chat, 1);
+        //     }
+        // }
+        "GetChatHistory" => {
+            if parsed["@type"] == "messages" {
+                let messages: Messages = serde_json::from_value(parsed)?;
+                for message in messages.messages() {
+                    let message = message.as_ref().unwrap();
+                    let parsed_message = MessageMeta::from_message(message, None);
+                    debug!("{:?}", message);
+                    debug!("{:?}", parsed_message);
+                    if parsed_message.is_match() {
+                        let profile_match = ProfileMatch {
+                            url: parsed_message.url().as_ref().unwrap().to_string(),
+                            full_text: parsed_message.text().to_string(),
+                        };
+                        profile_match.insert_db(pg_client).await.unwrap();
+                    }
+                    update_last_message(message.id());
+                }
             }
         }
-    } else if parsed["@type"] == "chat" {
-        let chat: Chat = serde_json::from_value(parsed)?;
-        let last_message = chat.last_message().as_ref().unwrap().clone();
-        let parsed_message = MessageMeta::from_message(&last_message, Some(chat.last_read_inbox_message_id()));
-        // log::error!("l_m.chat_id {} l_m.id {} chat.id {:?} c.l_r_i {} title {} is_read {} msg_outgoing {}", last_message.chat_id(), last_message.id(),
-        //     chat.id(), chat.last_read_inbox_message_id(), chat.title(), parsed_message.is_read(), last_message.is_outgoing());
-        if *parsed_message.is_read() == false {
-            // todo if chat.id() is in BLOCK_LIST
-            let chat_meta = ChatMeta::new(chat.id(), parsed_message);
-            unread_chats.lock().unwrap().insert(chat.id(), chat_meta);
+        "GetChat" => {
+            if parsed["@type"] == "chat" {
+                let chat: Chat = serde_json::from_value(parsed)?;
+                match chat.last_message().as_ref() {
+                    Some(last_message) => {
+                        let parsed_message = MessageMeta::from_message(last_message, Some(chat.last_read_inbox_message_id()));
+                        let chat_meta = ChatMeta::new(client_id, chat.id(), parsed_message);
+                        chat_meta.insert_db(pg_client).await;
+                    }
+                    None => {
+                        debug!("{:?}", chat);
+                    }
+                }
+            }
+        }
+        "SearchPublicChat" => {
+            if parsed["@type"] == "chat" {
+                info!("last_tdlib_call {}", parsed);
+                let chat: Chat = serde_json::from_value(parsed)?;
+                let id = chat.id();
+                info!("public id {id}");
+            }
+        }
+        "DownloadFile" => {
+            if parsed["@type"] == "updateFile" {
+                let update_file: UpdateFile = serde_json::from_value(parsed)?;
+                let path = update_file.file().local().path();
+                debug!("Path {path}");
+                if !path.is_empty() {
+                    let uuid = Uuid::new_v4();
+                    let new_path = format!("profile_images/{}.png",
+                                           uuid.to_string());
+
+                    move_file(path, &new_path)?;
+                }
+            }
+        }
+        _ => {
+            // error!("Unknown last_tdlib_call {}", last_tdlib_call.as_str());
         }
     }
     Ok(())

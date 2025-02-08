@@ -1,3 +1,4 @@
+use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 
@@ -24,4 +25,11 @@ pub fn read_json_file (path: &str) -> std::io::Result<String> {
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
     Ok(contents)
+}
+pub fn move_file(src: &str, dest: &str) -> std::io::Result<()> {
+    fs::rename(src, dest).unwrap_or_else(|err| {
+        // todo resolve why error is thrown even though the move is made
+        // error!("Failed to move file: {}", err);
+    });
+    Ok(())
 }

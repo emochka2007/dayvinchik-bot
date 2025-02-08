@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::env;
 use std::error::Error;
 use std::fmt::format;
+use log::debug;
 use reqwest::Client;
 use rust_tdlib::types::Chat;
 use serde::de::DeserializeOwned;
@@ -27,7 +28,7 @@ impl OpenAI {
     }
 
     //Post Request
-    async fn post<T: DeserializeOwned>(&self, body: Value) -> Result<T,OpenAIError> {
+    async fn post<T: DeserializeOwned>(&self, body: Value) -> Result<T, OpenAIError> {
         let response = self.client.post(format!("{}completions", self.base_url))
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", self.key))
@@ -36,7 +37,7 @@ impl OpenAI {
         Ok(response.json::<T>().await?)
     }
 
-    pub async fn generate_response(&self, message: String) -> Result<String, OpenAIError> {
+    pub async fn send_user_message(&self, message: String) -> Result<String, OpenAIError> {
         let prompt = Prompt::main(&message);
         let content = prompt.user;
         let body = json!({
@@ -48,7 +49,57 @@ impl OpenAI {
         });
         let response = self.post::<ChatCompletionResponse>(body).await?;
         let text = response.choices.get(0).unwrap().message.content.to_string();
-        println!("text {text}");
+        Ok(text)
+    }
+    pub async fn send_sys_message(&self, sys_message: String, user_message: String) -> Result<String, OpenAIError> {
+        let prompt = Prompt::analyze();
+        let sys = prompt.system.unwrap();
+        let user = prompt.user;
+        let body = json!({
+        "model": "gpt-4o",
+        "store": true,
+        "messages": [
+            {"role": "system", "content": sys },
+            {"role": "user", "content": user }
+        ]
+        });
+        let response = self.post::<ChatCompletionResponse>(body).await?;
+        debug!("{:?}", response);
+        let text = response.choices.get(0).unwrap().message.content.to_string();
+        Ok(text)
+    }
+    pub async fn send_sys_image_message(&self, sys_message: String, user_message: String) -> Result<String, OpenAIError> {
+        let prompt = Prompt::analyze();
+        let sys = prompt.system.unwrap();
+        let user = prompt.user;
+        let body = json!({
+    "model": "gpt-4o",
+    "store": true,
+    "messages": [
+        {
+            "role": "system",
+            "content": "sys"
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": user
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": "data:image/jpeg;base64"
+                    }
+                }
+            ]
+        }
+    ]
+});
+        let response = self.post::<ChatCompletionResponse>(body).await?;
+        debug!("{:?}", response);
+        let text = response.choices.get(0).unwrap().message.content.to_string();
         Ok(text)
     }
 }

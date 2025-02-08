@@ -1,9 +1,15 @@
 ### Current implementation
-- list all active matches and check if the messages have been sent out
-- iterate over cities with one account.
+- Store the currently reviewing profi to send all photos to gpt to analuze
+- Insert each review inside the db with the status `PENDING`, 'COMPLETED'
+
+- move all global states to PG
+- vectorize data in pg
+- educating tool to store only correct data
 - OpenAi analyzes photo and creates a superlike message
+- send out to all matches MSG_STARTER
 - multiple variants to start (love ur style, nyashka, wanna go for a walk) conside
-- interact with db
+- iterate over cities with one account.
+- all db entities in one folder 
 
 - Roadmap
     - TDlib setup
@@ -33,4 +39,6 @@
 
 ## Done
 - Detect unread messages
+- list all active matches
 - Get the match message
+- interact with db

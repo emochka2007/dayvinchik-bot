@@ -2182,6 +2182,7 @@ dependencies = [
  "dotenvy",
  "env_logger",
  "image",
+ "lazy_static",
  "log",
  "postgres",
  "project-root",
