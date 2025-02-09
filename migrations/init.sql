@@ -32,5 +32,7 @@ END $$;
 Create table if not exists profile_reviewer (
     id uuid primary key default uuid_generate_v4(),
     chat_id bigint,
+    text text,
+    file_ids text[],
     status ProfileReviewerStatus
 )

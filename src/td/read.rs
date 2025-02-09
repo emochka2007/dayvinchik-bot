@@ -7,6 +7,7 @@ use uuid::Uuid;
 use crate::chats::{td_chat_info, td_chat_history, ChatMeta};
 use crate::constants::{get_last_tdlib_call, update_last_message};
 use crate::entities::profile_match::{ProfileMatch};
+use crate::entities::profile_reviewer::{ProfileReviewer, ProfileReviewerStatus};
 use crate::file::{file_log, log_append, move_file};
 use crate::td::td_message::{match_message_content, MessageMeta};
 use crate::td::tdjson::ClientId;
@@ -39,6 +40,10 @@ pub async fn parse_message(json_str: &str, client_id: ClientId, pg_client: &Clie
                         };
                         profile_match.insert_db(pg_client).await.unwrap();
                     }
+                    //todo if profile_reviwer active
+                    let profile_reviewer = ProfileReviewer::new(
+                        message.chat_id(), parsed_message.text(), ProfileReviewerStatus::PENDING);
+                    profile_reviewer.insert_db(pg_client).await.expect("TODO: panic message");
                     update_last_message(message.id());
                 }
             }

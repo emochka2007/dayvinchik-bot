@@ -1,17 +1,20 @@
 use std::time::Duration;
 use log::debug;
 use rust_tdlib::types::{ChatInviteLink, SearchPublicChat};
+use rust_tdlib::types::LoginUrlInfo::Open;
 use serde_json::Error;
 use tokio::time::sleep;
+use tokio_postgres::Client;
 use crate::chats::{td_chat_history, td_get_chats};
 use crate::constants::{update_last_tdlib_call, VINCHIK_CHAT};
+use crate::entities::profile_reviewer::ProfileReviewer;
 use crate::message::{CustomGetMe, SendMessage};
 use crate::openapi::llm_api::OpenAI;
 use crate::superlike::SuperLike;
 use crate::td::td_file::td_file_download;
 use crate::td::tdjson::{send, ClientId};
 
-pub async fn match_input(input: String, client_id: ClientId) -> Result<(), Error> {
+pub async fn match_input(input: String, client_id: ClientId, pg_client: &Client) -> Result<(), Error> {
     println!("input - {input}");
     let vinchik = VINCHIK_CHAT.parse::<i64>().unwrap();
     match input.to_uppercase().as_str().trim() {
@@ -33,7 +36,15 @@ pub async fn match_input(input: String, client_id: ClientId) -> Result<(), Error
             send(client_id, &message);
             sleep(Duration::new(2, 0)).await;
             td_chat_history(client_id, vinchik, 1);
-
+            sleep(Duration::new(2, 0)).await;
+            let last_pending = ProfileReviewer::get_last_pending(pg_client).await.unwrap();
+            for file in last_pending.file_ids().as_ref().unwrap_or(&Vec::new()) {
+                let download_msg = td_file_download(*file);
+                let message = serde_json::to_string(&download_msg)?;
+                send(client_id, &message);
+                update_last_tdlib_call("DownloadFile".to_string());
+            }
+            let open_ai = OpenAI::new();
         }
         "O" => {
             let open_ai = OpenAI::new();
@@ -78,11 +89,11 @@ pub async fn match_input(input: String, client_id: ClientId) -> Result<(), Error
                 // let message = serde_json::to_string(&constructed_message).unwrap();
                 // send(client_id, &message);
         }
-        "M" => {
-            let get_me_msg = &CustomGetMe::builder();
-            let message = serde_json::to_string(&get_me_msg).unwrap();
-            send(client_id, &message);
-        }
+        // "M" => {
+        //     let get_me_msg = &CustomGetMe::builder();
+        //     let message = serde_json::to_string(&get_me_msg).unwrap();
+        //     send(client_id, &message);
+        // }
         "F" => {
             let download_msg = td_file_download(1230);
             let message = serde_json::to_string(&download_msg).unwrap();
