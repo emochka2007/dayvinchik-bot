@@ -68,10 +68,11 @@ impl OpenAI {
         let text = response.choices.get(0).unwrap().message.content.to_string();
         Ok(text)
     }
-    pub async fn send_sys_image_message(&self, sys_message: String, user_message: String) -> Result<String, OpenAIError> {
+    pub async fn send_sys_image_message(&self, sys_message: String, user_message: String, image: String) -> Result<String, OpenAIError> {
         let prompt = Prompt::analyze();
         let sys = prompt.system.unwrap();
         let user = prompt.user;
+        let base64img = format!("data:image/jpeg;base64{}", image);
         let body = json!({
     "model": "gpt-4o",
     "store": true,
@@ -90,7 +91,7 @@ impl OpenAI {
                 {
                     "type": "image_url",
                     "image_url": {
-                        "url": "data:image/jpeg;base64"
+                        "url": base64img
                     }
                 }
             ]

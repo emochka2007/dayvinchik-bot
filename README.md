@@ -10,6 +10,7 @@
 - multiple variants to start (love ur style, nyashka, wanna go for a walk) conside
 - iterate over cities with one account.
 - all db entities in one folder 
+- vectorize all of my chats and store in pg
 
 - Roadmap
     - TDlib setup

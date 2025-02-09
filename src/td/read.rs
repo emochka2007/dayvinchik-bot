@@ -9,11 +9,12 @@ use crate::constants::{get_last_tdlib_call, update_last_message};
 use crate::entities::profile_match::{ProfileMatch};
 use crate::entities::profile_reviewer::{ProfileReviewer, ProfileReviewerStatus};
 use crate::file::{file_log, log_append, move_file};
+use crate::pg::pg::PgClient;
 use crate::td::td_message::{match_message_content, MessageMeta};
 use crate::td::tdjson::ClientId;
 use crate::UnreadChats;
 
-pub async fn parse_message(json_str: &str, client_id: ClientId, pg_client: &Client) -> std::io::Result<()> {
+pub async fn parse_message(json_str: &str, client_id: ClientId, pg_client: &PgClient) -> std::io::Result<()> {
     let parsed: Value = serde_json::from_str(json_str)?;
     let last_tdlib_call = get_last_tdlib_call();
     match last_tdlib_call.as_str() {
@@ -31,8 +32,7 @@ pub async fn parse_message(json_str: &str, client_id: ClientId, pg_client: &Clie
                 for message in messages.messages() {
                     let message = message.as_ref().unwrap();
                     let parsed_message = MessageMeta::from_message(message, None);
-                    debug!("{:?}", message);
-                    debug!("{:?}", parsed_message);
+                    // debug!("{:?}", message);
                     if parsed_message.is_match() {
                         let profile_match = ProfileMatch {
                             url: parsed_message.url().as_ref().unwrap().to_string(),
@@ -40,10 +40,14 @@ pub async fn parse_message(json_str: &str, client_id: ClientId, pg_client: &Clie
                         };
                         profile_match.insert_db(pg_client).await.unwrap();
                     }
+                    debug!("{:?}", parsed_message);
                     //todo if profile_reviwer active
-                    let profile_reviewer = ProfileReviewer::new(
-                        message.chat_id(), parsed_message.text(), ProfileReviewerStatus::PENDING);
-                    profile_reviewer.insert_db(pg_client).await.expect("TODO: panic message");
+                    if !parsed_message.text().is_empty() && parsed_message.file_ids().is_some() {
+                        let mut profile_reviewer = ProfileReviewer::new(
+                            message.chat_id(), parsed_message.text(), ProfileReviewerStatus::PENDING);
+                        profile_reviewer.set_file_ids(Some(parsed_message.file_ids().as_ref().unwrap().clone()));
+                        profile_reviewer.insert_db(pg_client).await.expect("TODO: panic message");
+                    }
                     update_last_message(message.id());
                 }
             }
@@ -65,22 +69,20 @@ pub async fn parse_message(json_str: &str, client_id: ClientId, pg_client: &Clie
         }
         "SearchPublicChat" => {
             if parsed["@type"] == "chat" {
-                info!("last_tdlib_call {}", parsed);
                 let chat: Chat = serde_json::from_value(parsed)?;
                 let id = chat.id();
-                info!("public id {id}");
             }
         }
         "DownloadFile" => {
+            //todo overwrite in case of multi-file support
             if parsed["@type"] == "updateFile" {
+                let last_pending = ProfileReviewer::get_last_pending(pg_client).await.unwrap();
                 let update_file: UpdateFile = serde_json::from_value(parsed)?;
                 let path = update_file.file().local().path();
                 debug!("Path {path}");
                 if !path.is_empty() {
-                    let uuid = Uuid::new_v4();
-                    let new_path = format!("profile_images/{}.png",
-                                           uuid.to_string());
-
+                    let new_path = format!(
+                        "profile_images/{}.png", last_pending.main_file());
                     move_file(path, &new_path)?;
                 }
             }

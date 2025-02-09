@@ -1,5 +1,5 @@
 use log::error;
-use rust_tdlib::types::{Message, MessageContent, TextEntity, TextEntityType, TextEntityTypeTextUrl, TextEntityTypeUrl};
+use rust_tdlib::types::{Message, MessageContent, TextEntity, TextEntityType};
 use crate::td::td_file::td_file_download;
 
 #[derive(Debug)]
@@ -51,6 +51,9 @@ impl MessageMeta {
     }
     pub fn text(&self) -> &String {
         &self.text
+    }
+    pub fn file_ids(&self) -> &Option<Vec<i32>> {
+        &self.file_ids
     }
 }
 

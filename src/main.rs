@@ -26,7 +26,7 @@ use crate::chats::{ChatMeta, UnreadChats};
 use crate::entities::profile_match::{ProfileMatch};
 use crate::helpers::input;
 use crate::input::match_input;
-use crate::pg::pg::{connect_pg_from_env, run_migrations, PgConnect};
+use crate::pg::pg::{connect_pg_from_env, create_pool_from_env, run_migrations, PgConnect};
 use crate::td::read::parse_message;
 use crate::td::tdjson::{new_client, receive};
 use crate::td::{init_tdlib_params};
@@ -38,28 +38,22 @@ async fn main() {
     set_log_verbosity_level(0);
     env_logger::init();
     log::info!("Start");
-    //
-    // todo need to implement creating two separate connections for reading and writing
-
     dotenvy::dotenv().unwrap();
     // Connect postgres
-    let pg_client = connect_pg_from_env().await.unwrap();
-    let pg_client = Arc::new(Mutex::new(pg_client));
+    let pool =  create_pool_from_env().await.unwrap();
 
-    let client_guard = pg_client.lock().await;
-    run_migrations(&client_guard).await;
+    let client = pool.get().await.unwrap();
+    run_migrations(&client).await;
+
+    //tdlib client
     let client_id = new_client();
 
-
-    //todo why clone
-    let pg_client_clone = pg_client.clone();
     tokio::spawn(async move {
         loop {
             let res = receive(2.0);
             if let Some(x) = res {
                 // println!("X -> {x}");
-                let pg_client = pg_client_clone.lock().await;
-                parse_message(&x, client_id, &pg_client).await.unwrap();
+                parse_message(&x, client_id, &client).await.unwrap();
             }
         }
     });
@@ -72,11 +66,11 @@ async fn main() {
     // IF QR AUTH NEEDED
     // qr_auth_init(client_id);
 
+    // Second client for pools
     loop {
+        let client = pool.get().await.unwrap();
         let input = input().unwrap();
-        let pg_client = pg_client.lock().await;
-        match_input(input, client_id, &pg_client).await.expect("TODO: panic message");
-        // tokio::time::sleep(Duration::new(1, 0)).await;
+        match_input(input, client_id, &client).await.expect("TODO: panic message");
     }
 }
 

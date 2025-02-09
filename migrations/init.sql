@@ -23,16 +23,12 @@ Create table if not exists matches (
     chat_id int null
 );
 
-DO $$ BEGIN
-    Create type ProfileReviewerStatus as ENUM ('PENDING', 'COMPLETED');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
 
-Create table if not exists profile_reviewer (
+Create table if not exists profile_reviewers (
     id uuid primary key default uuid_generate_v4(),
     chat_id bigint,
     text text,
-    file_ids text[],
-    status ProfileReviewerStatus
+    file_ids int[],
+    -- PENDING, COMPLETED
+    status text
 )

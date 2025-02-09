@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use rust_tdlib::types::{GetChat, GetChatHistory, GetChats};
-use tokio_postgres::Client;
 use crate::constants::{get_last_message, update_last_tdlib_call};
+use crate::pg::pg::PgClient;
 use crate::td::td_message::MessageMeta;
 use crate::td::tdjson::{send, ClientId};
 
@@ -25,7 +25,7 @@ impl ChatMeta {
     pub fn last_message_text(&self) -> &String {
         &self.last_message.text()
     }
-    pub async fn insert_db(&self, client: &Client) -> () {
+    pub async fn insert_db(&self, client: &PgClient) -> () {
         let query = "INSERT INTO chats (td_client_id, td_chat_id, is_read) \
     VALUES ($1,$2,$3) ON CONFLICT (td_chat_id) \
     DO UPDATE SET is_read=$3";

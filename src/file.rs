@@ -1,6 +1,10 @@
-use std::fs;
+use std::{fs, io};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
+use base64::{encode, Engine};
+use base64::engine::general_purpose;
+use base64::prelude::BASE64_STANDARD;
+use log::debug;
 
 pub fn file_log(data: String){
     let mut write_context = File::create("teleterm.json").unwrap();
@@ -32,4 +36,12 @@ pub fn move_file(src: &str, dest: &str) -> std::io::Result<()> {
         // error!("Failed to move file: {}", err);
     });
     Ok(())
+}
+pub fn image_to_base64(path: &str) -> io::Result<String> {
+    let mut file = File::open(path)?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
+    let encoded = BASE64_STANDARD.encode(buffer);
+    debug!("{:?}", encoded);
+    Ok(encoded)
 }
