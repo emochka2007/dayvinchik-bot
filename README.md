@@ -1,7 +1,7 @@
-### Current implementation
-- Store the currently reviewing profi to send all photos to gpt to analuze
-- Insert each review inside the db with the status `PENDING`, 'COMPLETED'
+## Altushka Bot
+- Identifies altushka from chat bot using LLM with a score, and will talk for u
 
+### Current implementation
 - move all global states to PG
 - vectorize data in pg
 - educating tool to store only correct data
@@ -11,6 +11,7 @@
 - iterate over cities with one account.
 - all db entities in one folder 
 - vectorize all of my chats and store in pg
+- querybuilder psql
 
 - Roadmap
     - TDlib setup
@@ -37,9 +38,15 @@
 - Random timestamp between answers
 - Goals and checks in chat, getting info about girl (name, age, activity, favourite animal)
 - analyze ignored chats (no answer for more than 24 hrs)
+- Find altushka from the photo and identify.
+- 
 
 ## Done
 - Detect unread messages
 - list all active matches
 - Get the match message
 - interact with db
+- Store the currently reviewing profi to send all photos to gpt to analuze
+- Insert each review inside the db with the status `PENDING`, 'COMPLETED'
+
+ 

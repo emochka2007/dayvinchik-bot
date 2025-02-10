@@ -30,5 +30,6 @@ Create table if not exists profile_reviewers (
     text text,
     file_ids int[],
     -- PENDING, COMPLETED
-    status text
+    status text,
+    score int null
 )

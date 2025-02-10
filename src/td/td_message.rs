@@ -1,6 +1,5 @@
-use log::error;
+use log::{error};
 use rust_tdlib::types::{Message, MessageContent, TextEntity, TextEntityType};
-use crate::td::td_file::td_file_download;
 
 #[derive(Debug)]
 pub struct MessageMeta {
@@ -72,13 +71,16 @@ pub fn match_message_content(msg_content: MessageContent) -> std::io::Result<Par
     let mut file_ids = Vec::new();
     match msg_content {
         // If video just send only caption
-        MessageContent::MessageVideo(mut content) => {
+        MessageContent::MessageVideo(content) => {
             parsed_content.text = content.caption().text().clone();
             let entities = content.caption().entities();
             get_url_entity(entities, &mut parsed_content);
         }
         MessageContent::MessagePhoto(content) => {
             parsed_content.text = content.caption().text().clone();
+            // debug!("{:?}", content.photo().sizes());
+            // let smallest_photo = content.photo().sizes().first().unwrap();
+            // file_ids.push(smallest_photo.photo().id());
             let largest_size = content.photo().sizes().last().unwrap();
             file_ids.push(largest_size.photo().id());
             let entities = content.caption().entities();

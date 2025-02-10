@@ -1,4 +1,4 @@
-use log::{debug, error, info};
+use log::{debug, error};
 use tokio_postgres::{Client, Error};
 use uuid::Uuid;
 use crate::pg::pg::PgClient;
@@ -14,6 +14,7 @@ pub enum ProfileReviewerStatus {
 pub struct ProfileReviewer {
     id: String,
     chat_id: i64,
+    score: Option<i16>,
     text: String,
     status: ProfileReviewerStatus,
     file_ids: Option<Vec<i32>>
@@ -26,8 +27,21 @@ impl ProfileReviewer {
             chat_id,
             text: text.to_string(),
             status,
+            score: None,
             file_ids: None
         }
+    }
+    pub fn _score(&self) -> &Option<i16> {
+        &self.score
+    }
+    pub fn _status(&self) -> &ProfileReviewerStatus {
+        &self.status
+    }
+    pub fn id(&self) -> &String {
+        &self.id
+    }
+    pub fn _file_ids(&self) -> &Option<Vec<i32>> {
+        &self.file_ids
     }
     pub fn set_file_ids(&mut self, file_ids: Option<Vec<i32>>) {
         self.file_ids = file_ids;
@@ -42,6 +56,7 @@ impl ProfileReviewer {
                 debug!("{:?}", row); // Log the row data
                 Ok(Self {
                     chat_id: row.try_get("chat_id")?,
+                    score: row.try_get("score").unwrap_or_default(),
                     id: row.try_get("id")?,
                     text: row.try_get("text")?,
                     status: ProfileReviewerStatus::PENDING,
@@ -68,7 +83,15 @@ impl ProfileReviewer {
         ]).await?;
         Ok(())
     }
-    pub fn file_ids(&self) -> &Option<Vec<i32>> {
-        &self.file_ids
+
+    pub async fn finalize(&self, client: &PgClient, score: i32) -> Result<(), Error> {
+        let query = "UPDATE profile_reviewers SET \
+        status='COMPLETED', \
+        score=$1 \
+        WHERE id=$2";
+        //todo make it clean
+        client.query(query, &[&score,
+            &Uuid::parse_str(&self.id).unwrap()]).await?;
+        Ok(())
     }
 }

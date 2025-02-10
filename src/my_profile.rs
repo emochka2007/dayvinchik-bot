@@ -5,7 +5,7 @@ pub struct MyProfile {
 }
 
 impl MyProfile {
-    pub fn new() -> Self {
+    pub fn _new() -> Self {
         Self {
             name: "Nikita".to_string(),
             age: 23

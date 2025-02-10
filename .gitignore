@@ -10,4 +10,7 @@ qr_code.png
 
 # dir used in tdlib setup params
 /tdlib_artefacts
+
 /profile_images/*
+/reviewed_images/*
+/alt_images/*

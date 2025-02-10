@@ -1,12 +1,8 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use rust_tdlib::types::{GetChat, GetChatHistory, GetChats};
 use crate::constants::{get_last_message, update_last_tdlib_call};
 use crate::pg::pg::PgClient;
 use crate::td::td_message::MessageMeta;
 use crate::td::tdjson::{send, ClientId};
-
-pub type UnreadChats = Arc<Mutex<HashMap<i64, ChatMeta>>>;
 
 #[derive(Debug)]
 pub struct ChatMeta {
@@ -22,7 +18,7 @@ impl ChatMeta {
             last_message,
         }
     }
-    pub fn last_message_text(&self) -> &String {
+    pub fn _last_message_text(&self) -> &String {
         &self.last_message.text()
     }
     pub async fn insert_db(&self, client: &PgClient) -> () {
@@ -36,8 +32,8 @@ impl ChatMeta {
 }
 
 pub fn td_get_chats(client_id: ClientId) {
-    let publicChats = GetChats::builder().limit(100).build();
-    let message = serde_json::to_string(&publicChats).unwrap();
+    let public_chats = GetChats::builder().limit(100).build();
+    let message = serde_json::to_string(&public_chats).unwrap();
     send(client_id, &message);
     update_last_tdlib_call("GetChats".to_string());
 }
@@ -57,13 +53,4 @@ pub fn td_chat_info(client_id: ClientId, chat_id: i64) {
     let chat_history_msg = serde_json::to_string(&message).unwrap();
     send(client_id, &chat_history_msg);
     update_last_tdlib_call("GetChat".to_string());
-}
-
-//return none if not match and link if it does
-pub fn identify_match(text: &str) -> std::io::Result<String> {
-    let match_to_contain = "Есть взаимная симпатия!";
-    // if text.contains(match_to_contain) {
-    //
-    // }
-    Ok(match_to_contain.to_string())
 }

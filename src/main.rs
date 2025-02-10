@@ -15,24 +15,14 @@ mod openapi;
 mod helpers;
 mod entities;
 
-use std::collections::HashMap;
-use std::env;
-use std::sync::Arc;
-use serde::Serialize;
-use std::time::Duration;
 use rust_tdlib::tdjson::set_log_verbosity_level;
-use rust_tdlib::types::Chat;
-use crate::chats::{ChatMeta, UnreadChats};
-use crate::entities::profile_match::{ProfileMatch};
 use crate::helpers::input;
 use crate::input::match_input;
-use crate::pg::pg::{connect_pg_from_env, create_pool_from_env, run_migrations, PgConnect};
+use crate::pg::pg::{create_pool_from_env, run_migrations};
 use crate::td::read::parse_message;
 use crate::td::tdjson::{new_client, receive};
 use crate::td::{init_tdlib_params};
-use tokio::sync::Mutex;
 
-//todo ListOfMatches
 #[tokio::main]
 async fn main() {
     set_log_verbosity_level(0);
@@ -40,7 +30,7 @@ async fn main() {
     log::info!("Start");
     dotenvy::dotenv().unwrap();
     // Connect postgres
-    let pool =  create_pool_from_env().await.unwrap();
+    let pool = create_pool_from_env().await.unwrap();
 
     let client = pool.get().await.unwrap();
     run_migrations(&client).await;
@@ -61,16 +51,20 @@ async fn main() {
     init_tdlib_params(client_id);
 
     // wait for register -> change to func state checker
-    tokio::time::sleep(Duration::new(1, 0)).await;
+    // tokio::time::sleep(Duration::new(1, 0)).await;
 
     // IF QR AUTH NEEDED
     // qr_auth_init(client_id);
 
     // Second client for pools
     loop {
-        let client = pool.get().await.unwrap();
-        let input = input().unwrap();
-        match_input(input, client_id, &client).await.expect("TODO: panic message");
+        if let Ok(input) = input() {
+            if let Ok(client) = pool.get().await {
+                tokio::spawn(async move { match_input(input, client_id, &client).await.unwrap() });
+            }
+        } else {
+            log::error!("Failed to get input");
+        }
     }
 }
 

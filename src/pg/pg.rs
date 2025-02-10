@@ -1,11 +1,8 @@
 use std::env;
 use std::env::VarError;
-use std::ffi::c_double;
-use deadpool_postgres::{Pool, Config, Runtime, Object, Manager, ManagerConfig, RecyclingMethod};
-use dotenvy::Error;
-use log::{debug, info};
-use tokio_postgres::{Client, Connection, NoTls, Socket};
-use tokio_postgres::tls::{NoTlsStream, TlsStream};
+use deadpool_postgres::{Pool, Config, Runtime, Manager, ManagerConfig, RecyclingMethod};
+use log::{info};
+use tokio_postgres::{Client, NoTls};
 
 pub type PgClient = deadpool::managed::Object<Manager>;
 
@@ -52,7 +49,7 @@ impl PgConnect {
         self.port = port;
         self
     }
-    pub async fn connect(&self) -> std::io::Result<Client> {
+    pub async fn _connect(&self) -> std::io::Result<Client> {
         let conn_str = format!("host={} user={} password={} dbname={} port={}",
                                self.host, self.user, self.password, self.dbname, self.port);
         let (client, connection) =tokio_postgres::connect(&conn_str, NoTls).await.unwrap();
@@ -80,14 +77,14 @@ impl PgConnect {
     }
 }
 
-pub async fn connect_pg_from_env() -> std::io::Result<Client> {
+pub async fn _connect_pg_from_env() -> std::io::Result<Client> {
     PgConnect::new()
         .dbname(env::var("PG_DB").unwrap())
         .password(env::var("PG_PASS").unwrap())
         .host(env::var("PG_HOST").unwrap())
         .user(env::var("PG_USER").unwrap())
         .port(env::var("PG_PORT").unwrap())
-        .connect().await
+        ._connect().await
 }
 pub async fn create_pool_from_env() -> Result<Pool, VarError> {
     let pool = PgConnect::new()

@@ -1,18 +1,14 @@
-use std::fmt::format;
-use log::{debug, error, info};
-use rust_tdlib::types::{Chat, Chats, Messages, SearchPublicChat, UpdateFile};
+use log::{debug};
+use rust_tdlib::types::{Chat, Messages, UpdateFile};
 use serde_json::Value;
-use tokio_postgres::Client;
-use uuid::Uuid;
-use crate::chats::{td_chat_info, td_chat_history, ChatMeta};
+use crate::chats::{ChatMeta};
 use crate::constants::{get_last_tdlib_call, update_last_message};
 use crate::entities::profile_match::{ProfileMatch};
 use crate::entities::profile_reviewer::{ProfileReviewer, ProfileReviewerStatus};
-use crate::file::{file_log, log_append, move_file};
+use crate::file::{move_file};
 use crate::pg::pg::PgClient;
-use crate::td::td_message::{match_message_content, MessageMeta};
+use crate::td::td_message::{MessageMeta};
 use crate::td::tdjson::ClientId;
-use crate::UnreadChats;
 
 pub async fn parse_message(json_str: &str, client_id: ClientId, pg_client: &PgClient) -> std::io::Result<()> {
     let parsed: Value = serde_json::from_str(json_str)?;
@@ -42,11 +38,14 @@ pub async fn parse_message(json_str: &str, client_id: ClientId, pg_client: &PgCl
                     }
                     debug!("{:?}", parsed_message);
                     //todo if profile_reviwer active
-                    if !parsed_message.text().is_empty() && parsed_message.file_ids().is_some() {
-                        let mut profile_reviewer = ProfileReviewer::new(
-                            message.chat_id(), parsed_message.text(), ProfileReviewerStatus::PENDING);
-                        profile_reviewer.set_file_ids(Some(parsed_message.file_ids().as_ref().unwrap().clone()));
-                        profile_reviewer.insert_db(pg_client).await.expect("TODO: panic message");
+                    let file_ids = parsed_message.file_ids();
+                    if !parsed_message.text().is_empty() && file_ids.is_some() {
+                        if file_ids.clone().unwrap().iter().len() > 0 {
+                            let mut profile_reviewer = ProfileReviewer::new(
+                                message.chat_id(), parsed_message.text(), ProfileReviewerStatus::PENDING);
+                            profile_reviewer.set_file_ids(Some(parsed_message.file_ids().as_ref().unwrap().clone()));
+                            profile_reviewer.insert_db(pg_client).await.expect("TODO: panic message");
+                        }
                     }
                     update_last_message(message.id());
                 }
@@ -69,8 +68,8 @@ pub async fn parse_message(json_str: &str, client_id: ClientId, pg_client: &PgCl
         }
         "SearchPublicChat" => {
             if parsed["@type"] == "chat" {
-                let chat: Chat = serde_json::from_value(parsed)?;
-                let id = chat.id();
+                // let chat: Chat = serde_json::from_value(parsed)?;
+                // let id = chat.id();
             }
         }
         "DownloadFile" => {
