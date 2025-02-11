@@ -7,6 +7,7 @@ use crate::entities::profile_match::{ProfileMatch};
 use crate::entities::profile_reviewer::{ProfileReviewer, ProfileReviewerStatus};
 use crate::file::{move_file};
 use crate::pg::pg::PgClient;
+use crate::td::td_file::td_file_download;
 use crate::td::td_message::{MessageMeta};
 use crate::td::tdjson::ClientId;
 
@@ -45,6 +46,7 @@ pub async fn parse_message(json_str: &str, client_id: ClientId, pg_client: &PgCl
                                 message.chat_id(), parsed_message.text(), ProfileReviewerStatus::PENDING);
                             profile_reviewer.set_file_ids(Some(parsed_message.file_ids().as_ref().unwrap().clone()));
                             profile_reviewer.insert_db(pg_client).await.expect("TODO: panic message");
+                            td_file_download(client_id, profile_reviewer.main_file())?;
                         }
                     }
                     update_last_message(message.id());
@@ -75,7 +77,7 @@ pub async fn parse_message(json_str: &str, client_id: ClientId, pg_client: &PgCl
         "DownloadFile" => {
             //todo overwrite in case of multi-file support
             if parsed["@type"] == "updateFile" {
-                let last_pending = ProfileReviewer::get_last_pending(pg_client).await.unwrap();
+                let last_pending = ProfileReviewer::get_waiting(pg_client).await.unwrap();
                 let update_file: UpdateFile = serde_json::from_value(parsed)?;
                 let path = update_file.file().local().path();
                 debug!("Path {path}");

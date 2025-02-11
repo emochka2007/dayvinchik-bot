@@ -29,7 +29,7 @@ Create table if not exists profile_reviewers (
     chat_id bigint,
     text text,
     file_ids int[],
-    -- PENDING, COMPLETED
-    status text,
+    -- PENDING, WAITING, COMPLETED
+    status text default 'WAITING',
     score int null
 )

@@ -50,7 +50,7 @@ async fn main() {
 
     init_tdlib_params(client_id);
 
-    // wait for register -> change to func state checker
+    // todo wait for register -> change to func state checker
     // tokio::time::sleep(Duration::new(1, 0)).await;
 
     // IF QR AUTH NEEDED

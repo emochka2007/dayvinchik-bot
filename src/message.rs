@@ -25,6 +25,20 @@ pub struct FormattedText {
 
 //todo implement serialize
 impl SendMessage {
+    pub fn skip(chat_id: &str) -> Self {
+        let message = SendMessage {
+            t: "sendMessage".to_string(),
+            chat_id: chat_id.to_string(),
+            input_message_content: InputMessageContent {
+                t: "inputMessageText".to_string(),
+                text: FormattedText {
+                    td_type: "formattedText".to_string(),
+                    text: "👎".to_string(),
+                },
+            },
+        };
+        message
+    }
     pub fn like(chat_id: &str) -> Self {
         let message = SendMessage {
             t: "sendMessage".to_string(),
