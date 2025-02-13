@@ -1,4 +1,5 @@
-use tokio_postgres::{Client, Error};
+use tokio_postgres::{Error};
+use crate::pg::pg::PgClient;
 
 #[derive(Debug)]
 pub struct ProfileMatch {
@@ -8,7 +9,7 @@ pub struct ProfileMatch {
 }
 impl ProfileMatch {
     // todo create common trait for insert_db
-    pub async fn insert_db(&self, client: &Client) -> Result<(), Error> {
+    pub async fn insert_db(&self, client: &PgClient) -> Result<(), Error> {
         //todo check for fields before insert
         if self.url.is_empty() {}
         let query = "INSERT INTO matches (url, full_text)\
@@ -18,7 +19,7 @@ impl ProfileMatch {
     }
 }
 
-pub async fn _profile_match_by_link(client: &Client, link: &str) -> Result<ProfileMatch, Error> {
+pub async fn _profile_match_by_link(client: &PgClient, link: &str) -> Result<ProfileMatch, Error> {
     let query = "SELECT url, full_text FROM matches WHERE url = $1";
     let row = client.query_one(query, &[&link]).await?;
     let profile_match = ProfileMatch {

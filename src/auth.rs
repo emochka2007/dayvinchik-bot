@@ -1,5 +1,5 @@
 use rust_tdlib::types::RequestQrCodeAuthentication;
-use crate::td::tdjson::{send, ClientId};
+use crate::td::td_json::{send, ClientId};
 
 pub fn qr_auth_init(client_id: ClientId){
     let qr_code_message = RequestQrCodeAuthentication::builder().build();

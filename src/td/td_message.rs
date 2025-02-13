@@ -1,19 +1,24 @@
 use log::{error};
-use rust_tdlib::types::{Message, MessageContent, TextEntity, TextEntityType};
+use rust_tdlib::types::{Chat, Message, MessageContent, TextEntity, TextEntityType};
+use tokio_postgres::Error;
+use uuid::Uuid;
+use crate::common::{ChatId, FileId, MessageId};
+use crate::pg::pg::PgClient;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MessageMeta {
-    id: i64,
+    id: String,
+    message_id: MessageId,
     is_read: bool,
     text: String,
     created_at: i32,
-    chat_id: i64,
+    chat_id: ChatId,
     url: Option<String>,
-    file_ids: Option<Vec<i32>>
+    file_ids: Option<Vec<FileId>>
 }
 
 impl MessageMeta {
-    pub fn from_message(msg: &Message, last_read_inbox_message_id: Option<i64>) -> Self {
+    pub fn from_message(msg: &Message, last_read_inbox_message_id: Option<MessageId>) -> Self {
         let mut is_read = true;
         if !msg.is_outgoing() {
             if last_read_inbox_message_id.is_some() && msg.id() > last_read_inbox_message_id.unwrap() {
@@ -22,7 +27,8 @@ impl MessageMeta {
         }
         let parsed_content = match_message_content(msg.content().clone()).unwrap();
         Self {
-            id: msg.id(),
+            id: Uuid::new_v4().to_string(),
+            message_id: msg.id(),
             chat_id: msg.chat_id(),
             is_read,
             text: parsed_content.text,
@@ -36,8 +42,8 @@ impl MessageMeta {
         let match_string = "Есть взаимная симпатия!";
         self.text.contains(match_string)
     }
-    pub fn id(&self) -> &i64 {
-        &self.id
+    pub fn td_id(&self) -> &i64 {
+        &self.message_id
     }
     pub fn url(&self) -> &Option<String> {
         &self.url
@@ -53,6 +59,25 @@ impl MessageMeta {
     }
     pub fn file_ids(&self) -> &Option<Vec<i32>> {
         &self.file_ids
+    }
+    pub async fn insert_db(&self, client: &PgClient) -> Result<(), Error> {
+        let id = &Uuid::parse_str(&self.id).unwrap();
+        let query = "INSERT INTO messages (\
+        id, \
+        chat_id,\
+        message_id,\
+        is_read,\
+        text,\
+        url)\
+        VALUES ($1, $2, $3, $4, $5, $6)";
+        client.query(query, &[
+            &id,
+            &self.chat_id,
+            &self.message_id,
+            &self.is_read,
+            &self.text,
+            &self.url]).await?;
+        Ok(())
     }
 }
 

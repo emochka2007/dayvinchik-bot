@@ -12,7 +12,8 @@ use crate::pg::pg::PgClient;
 use crate::prompts::Prompt;
 use crate::superlike::SuperLike;
 use crate::td::td_file::td_file_download;
-use crate::td::tdjson::{send, ClientId};
+use crate::td::td_json::{send, ClientId};
+use crate::td::td_manager::TdManager;
 
 pub async fn match_input(input: String, client_id: ClientId, pg_client: &PgClient) -> Result<(), Error> {
     info!("input - {input}");
@@ -32,7 +33,7 @@ pub async fn match_input(input: String, client_id: ClientId, pg_client: &PgClien
             td_chat_history(client_id, vinchik, 2);
             // SEPARATE PROFILE REVIEWER (above code inserts the entry)
         }
-        "R" => {
+        "_" => {
             let start_message = SendMessage::text_message("/start", VINCHIK_CHAT);
             let message = serde_json::to_string(&start_message)?;
             send(client_id, &message);
@@ -78,11 +79,12 @@ pub async fn match_input(input: String, client_id: ClientId, pg_client: &PgClien
         }
         "C" => {
             // get_chat_info(client_id, VINCHIK_CHAT);
-            td_get_chats(client_id);
+            td_get_chats(client_id, pg_client).await;
         }
         "R" => {
-            // Latest message id read
-            td_chat_history(client_id, vinchik, 2);
+            let manager = TdManager::init(client_id, pg_client).await;
+            debug!("{:?}", manager);
+            manager.send_request().expect("Error sending request on manager");
         }
         // Get Last 100 messages from Vinchik chat
         "L" => {

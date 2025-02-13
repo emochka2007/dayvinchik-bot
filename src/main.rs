@@ -14,13 +14,14 @@ mod superlike;
 mod openapi;
 mod helpers;
 mod entities;
+mod common;
 
 use rust_tdlib::tdjson::set_log_verbosity_level;
 use crate::helpers::input;
 use crate::input::match_input;
 use crate::pg::pg::{create_pool_from_env, run_migrations};
 use crate::td::read::parse_message;
-use crate::td::tdjson::{new_client, receive};
+use crate::td::td_json::{new_client, receive};
 use crate::td::{init_tdlib_params};
 
 #[tokio::main]

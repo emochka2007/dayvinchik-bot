@@ -2,6 +2,7 @@
 - Identifies altushka from chat bot using LLM with a score, and will talk for u
 
 ### Current implementation
+- Callback executor with a queue
 - move all global states to PG
 - vectorize data in pg
 - educating tool to store only correct data

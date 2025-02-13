@@ -1,12 +1,14 @@
 use std::env;
 use serde::Serialize;
 use serde_json::Value;
-use crate::td::tdjson::{send, ClientId};
+use crate::td::td_json::{send, ClientId};
 
 pub mod td_message;
-pub mod tdjson;
+pub mod td_json;
 pub mod td_file;
 pub mod read;
+pub mod td_manager;
+pub mod td_command_map;
 
 #[derive(Serialize)]
 pub struct TDLibParams {
