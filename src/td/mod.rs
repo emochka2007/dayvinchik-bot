@@ -9,6 +9,8 @@ pub mod td_file;
 pub mod read;
 pub mod td_manager;
 pub mod td_command_map;
+pub mod td_request;
+pub mod td_response;
 
 #[derive(Serialize)]
 pub struct TDLibParams {

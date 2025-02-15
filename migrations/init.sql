@@ -10,10 +10,12 @@ $$ LANGUAGE plpgsql;
 CREATE extension if not exists "uuid-ossp";
 CREATE table if not exists chats
 (
-    id         uuid primary key                     default uuid_generate_v4(),
-    chat_id    bigint unique,
-    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
-    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp
+    id                   uuid primary key                     default uuid_generate_v4(),
+    chat_id              bigint unique,
+    -- mb unique --
+    last_read_message_id bigint,
+    created_at           TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
+    updated_at           TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp
 );
 CREATE OR REPLACE TRIGGER set_timestamp
     BEFORE UPDATE
@@ -71,12 +73,14 @@ CREATE OR REPLACE TRIGGER set_timestamp
     FOR EACH ROW
 EXECUTE FUNCTION update_timestamp();
 
-Create table if not exists tasks(
-    id uuid primary key default uuid_generate_v4(),
-    message text,
+Create table if not exists tasks
+(
+    id         uuid primary key                     default uuid_generate_v4(),
+    message    text,
     -- WAITING, COMPLETED
-    status text DEFAULT 'WAITING',
-    response text,
+    status     text                                 DEFAULT 'WAITING',
+    request text,
+    response   text,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp
 );

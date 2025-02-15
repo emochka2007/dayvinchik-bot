@@ -1,9 +1,15 @@
-use log::{error};
-use rust_tdlib::types::{Chat, Message, MessageContent, TextEntity, TextEntityType};
+use log::{debug, error};
+use rust_tdlib::tdjson::ClientId;
+use rust_tdlib::types::{Chat, Message, MessageContent, Messages, TextEntity, TextEntityType};
+use serde_json::Value;
 use tokio_postgres::Error;
 use uuid::Uuid;
 use crate::common::{ChatId, FileId, MessageId};
+use crate::constants::update_last_message;
+use crate::entities::profile_match::ProfileMatch;
+use crate::entities::profile_reviewer::{ProfileReviewer, ProfileReviewerStatus};
 use crate::pg::pg::PgClient;
+use crate::td::td_file::td_file_download;
 
 #[derive(Debug, Clone)]
 pub struct MessageMeta {
@@ -14,7 +20,7 @@ pub struct MessageMeta {
     created_at: i32,
     chat_id: ChatId,
     url: Option<String>,
-    file_ids: Option<Vec<FileId>>
+    file_ids: Option<Vec<FileId>>,
 }
 
 impl MessageMeta {
@@ -42,17 +48,17 @@ impl MessageMeta {
         let match_string = "Есть взаимная симпатия!";
         self.text.contains(match_string)
     }
-    pub fn td_id(&self) -> &i64 {
-        &self.message_id
-    }
     pub fn url(&self) -> &Option<String> {
         &self.url
     }
     pub fn is_read(&self) -> &bool {
         &self.is_read
     }
-    pub fn chat_id(&self) -> &i64 {
+    pub fn chat_id(&self) -> &ChatId {
         &self.chat_id
+    }
+    pub fn message_id(&self) -> &MessageId {
+        &self.message_id
     }
     pub fn text(&self) -> &String {
         &self.text
@@ -84,14 +90,14 @@ impl MessageMeta {
 pub struct ParseMessageContent {
     text: String,
     url: Option<String>,
-    file_ids: Option<Vec<i32>>
+    file_ids: Option<Vec<i32>>,
 }
 pub fn match_message_content(msg_content: MessageContent) -> std::io::Result<ParseMessageContent> {
     let _path_to_append = "profile.log";
     let mut parsed_content = ParseMessageContent {
         url: None,
         file_ids: None,
-        text: String::from("unmatched")
+        text: String::from("unmatched"),
     };
     let mut file_ids = Vec::new();
     match msg_content {
@@ -128,8 +134,39 @@ fn get_url_entity(entities: &Vec<TextEntity>, content: &mut ParseMessageContent)
         match entity.type_() {
             TextEntityType::TextUrl(url) => {
                 content.url = Some(url.url().to_string());
-            },
+            }
             _ => {}
         }
     }
+}
+
+pub async fn chat_history(client_id: ClientId, json_str: Value, pg_client: &PgClient) -> Result<(), serde_json::Error> {
+    let messages: Messages = serde_json::from_value(json_str)?;
+
+    for message in messages.messages() {
+        let message = message.as_ref().unwrap();
+        let parsed_message = MessageMeta::from_message(message, None);
+        parsed_message.insert_db(pg_client).await.unwrap();
+        if parsed_message.is_match() {
+            let profile_match = ProfileMatch {
+                url: parsed_message.url().as_ref().unwrap().to_string(),
+                full_text: parsed_message.text().to_string(),
+            };
+            profile_match.insert_db(pg_client).await.unwrap();
+        }
+        debug!("{:?}", parsed_message);
+        //todo if profile_reviwer active
+        let file_ids = parsed_message.file_ids();
+        if !parsed_message.text().is_empty() & &file_ids.is_some() {
+            if file_ids.clone().unwrap().iter().len() > 0 {
+                let mut profile_reviewer = ProfileReviewer::new(
+                    message.chat_id(), parsed_message.text(), ProfileReviewerStatus::PENDING);
+                profile_reviewer.set_file_ids(Some(parsed_message.file_ids().as_ref().unwrap().clone()));
+                profile_reviewer.insert_db(pg_client).await.expect("TODO: panic message");
+                td_file_download(client_id, profile_reviewer.main_file())?;
+            }
+        }
+        // update_last_message(message.id());
+    }
+    Ok(())
 }

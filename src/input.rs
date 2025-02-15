@@ -2,7 +2,7 @@ use tokio::time::{sleep, Duration};
 use log::{debug, error, info};
 use rust_tdlib::types::{SearchPublicChat};
 use serde_json::Error;
-use crate::chats::{td_chat_history, td_get_chats};
+use crate::chats::{td_chat_history, td_chat_info, td_get_chats};
 use crate::constants::{update_last_tdlib_call, VINCHIK_CHAT};
 use crate::entities::profile_reviewer::ProfileReviewer;
 use crate::file::{image_to_base64, move_file};
@@ -16,8 +16,9 @@ use crate::td::td_json::{send, ClientId};
 use crate::td::td_manager::TdManager;
 
 pub async fn match_input(input: String, client_id: ClientId, pg_client: &PgClient) -> Result<(), Error> {
-    info!("input - {input}");
-    let vinchik = VINCHIK_CHAT.parse::<i64>().unwrap();
+    // info!("input - {input}");
+    let VINCHIK_i64 = VINCHIK_CHAT.parse::<i64>().unwrap();
+    let td_manager = TdManager::init(client_id);
     match input.to_uppercase().as_str().trim() {
         // main flow with analyze
         // Send /start - STARTED
@@ -26,12 +27,12 @@ pub async fn match_input(input: String, client_id: ClientId, pg_client: &PgClien
         // Get profile and store - GETTING_PROFILE
         // Ask gpt with prompt - ASKING_LLM
         // Receive number and store it. - APPROVED
-        "M" => {
-            // update chat history todo remove and store in db
-            // TODO important last_message_id logic is incorrect and needs to store in db
-            td_chat_history(client_id, vinchik, 1);
-            td_chat_history(client_id, vinchik, 2);
-            // SEPARATE PROFILE REVIEWER (above code inserts the entry)
+        //todo what we implement here
+        "C" => {
+            td_get_chats(pg_client).await;
+        }
+        "E" => {
+            td_manager.send_request(pg_client).await.unwrap();
         }
         "_" => {
             let start_message = SendMessage::text_message("/start", VINCHIK_CHAT);
@@ -77,18 +78,9 @@ pub async fn match_input(input: String, client_id: ClientId, pg_client: &PgClien
                 sleep(Duration::from_secs(2)).await;
             }
         }
-        "C" => {
-            // get_chat_info(client_id, VINCHIK_CHAT);
-            td_get_chats(client_id, pg_client).await;
-        }
-        "R" => {
-            let manager = TdManager::init(client_id, pg_client).await;
-            debug!("{:?}", manager);
-            manager.send_request().expect("Error sending request on manager");
-        }
         // Get Last 100 messages from Vinchik chat
         "L" => {
-            td_chat_history(client_id, vinchik, 100);
+            td_chat_history(client_id, VINCHIK_i64, 100);
         }
         // Flow of superlike
         // Send superlike message

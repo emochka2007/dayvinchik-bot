@@ -1,3 +1,7 @@
+todo: unread chats
+
+
+
 ## Altushka Bot
 - Identifies altushka from chat bot using LLM with a score, and will talk for u
 
