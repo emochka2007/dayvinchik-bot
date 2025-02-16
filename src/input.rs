@@ -16,7 +16,7 @@ use crate::td::td_json::{send, ClientId};
 use crate::td::td_manager::TdManager;
 
 pub async fn match_input(input: String, client_id: ClientId, pg_client: &PgClient) -> Result<(), Error> {
-    // info!("input - {input}");
+    info!("input - {input}");
     let VINCHIK_i64 = VINCHIK_CHAT.parse::<i64>().unwrap();
     let td_manager = TdManager::init(client_id);
     match input.to_uppercase().as_str().trim() {
@@ -32,7 +32,7 @@ pub async fn match_input(input: String, client_id: ClientId, pg_client: &PgClien
             td_get_chats(pg_client).await;
         }
         "E" => {
-            td_manager.send_request(pg_client).await.unwrap();
+            // td_manager.send_request(pg_client).await.unwrap();
         }
         "_" => {
             let start_message = SendMessage::text_message("/start", VINCHIK_CHAT);

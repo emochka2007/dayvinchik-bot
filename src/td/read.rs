@@ -20,10 +20,10 @@ use crate::td::td_response::ResponseKeys;
 
 pub async fn parse_message(json_str: &str, client_id: ClientId, pg_client: &PgClient) -> std::io::Result<()> {
     let json_value: Value = serde_json::from_str(json_str)?;
-    match json_value.get("@type")  {
+    match json_value.get("@type") {
         Some(td_type) => {
             let td_type = td_type.as_str().unwrap();
-            // info!("Td_type {td_type}");
+            info!("Td_type {td_type}");
             match ResponseKeys::from_str(td_type) {
                 Ok(key) => {
                     debug!("Key {:?}", key);
@@ -37,20 +37,20 @@ pub async fn parse_message(json_str: &str, client_id: ClientId, pg_client: &PgCl
                     match last_tdlib_call {
                         RequestKeys::GetChats => {
                             if key == ResponseKeys::Chats {
-                                info ! ("GetChats");
-                                let chats: Chats = serde_json::from_value(json_value) ?;
+                                info!("GetChats");
+                                let chats: Chats = serde_json::from_value(json_value)?;
                                 let chats_list = chats.chat_ids();
                                 for chat in chats_list {
-                                    debug ! ("{chat}");
-                                    td_chat_info(pg_client, * chat).await;
+                                    debug!("{chat}");
+                                    td_chat_info(pg_client, *chat).await;
                                     // td_chat_history(client_id, *chat, 1);
                                 }
                             }
                         }
                         RequestKeys::GetChatHistory => {
-                                if key == ResponseKeys::Messages {
-                                    chat_history(client_id, json_value, pg_client).await?
-                                }
+                            if key == ResponseKeys::Messages {
+                                chat_history(client_id, json_value, pg_client).await?
+                            }
                         }
                         RequestKeys::GetChat => {
                             if key == ResponseKeys::Chat {
@@ -67,13 +67,13 @@ pub async fn parse_message(json_str: &str, client_id: ClientId, pg_client: &PgCl
                             //todo overwrite in case of multi-file support
                             if json_value["@type"] == "updateFile" {
                                 let last_pending = ProfileReviewer::get_waiting(pg_client).await.unwrap();
-                                let update_file: UpdateFile = serde_json::from_value(json_value) ?;
+                                let update_file: UpdateFile = serde_json::from_value(json_value)?;
                                 let path = update_file.file().local().path();
-                                debug ! ("Path {path}");
-                                if ! path.is_empty() {
-                                    let new_path = format ! (
+                                debug!("Path {path}");
+                                if !path.is_empty() {
+                                    let new_path = format!(
                                         "profile_images/{}.png", last_pending.main_file());
-                                    move_file(path, &new_path) ?;
+                                    move_file(path, &new_path)?;
                                 }
                             }
                         }

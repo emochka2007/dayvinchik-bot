@@ -1,10 +1,10 @@
 use std::time::Duration;
 use log::{debug, error, info};
 use rust_tdlib::tdjson::ClientId;
-use tokio_postgres::{Error, Row};
+use tokio_postgres::{Client, Error, Row};
 use uuid::Uuid;
 use crate::constants::update_last_tdlib_call;
-use crate::pg::pg::PgClient;
+use crate::pg::pg::{PgClient, PgConnect};
 use crate::td::td_json::send;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
@@ -44,7 +44,7 @@ impl Default for Task {
             message: String::new(),
             status: TaskStatus::WAITING,
             response: ResponseKeys::Chat,
-            request: RequestKeys::Unknown
+            request: RequestKeys::Unknown,
         }
     }
 }
@@ -95,7 +95,7 @@ impl Task {
             response: row.try_get("response")?,
         })
     }
-    pub async fn first_waiting(pg_client: &PgClient) -> Result<Self, Error> {
+    pub async fn first_waiting(pg_client: &Client) -> Result<Self, Error> {
         let query = "SELECT * from tasks WHERE status='WAITING' LIMIT 1";
         let row = pg_client.query_one(query, &[]).await?;
         Self::parse_row(row)
@@ -106,7 +106,7 @@ impl Task {
         Self::parse_row(row)
     }
 
-    pub async fn to_pending(&self, pg_client: &PgClient) -> Result<(), Error> {
+    pub async fn to_pending(&self, pg_client: &Client) -> Result<(), Error> {
         let query = "UPDATE tasks SET status='PENDING' \
         WHERE id = $1";
         pg_client.query(query, &[self.id()]).await?;
@@ -129,25 +129,26 @@ impl TdManager {
         }
     }
 
-    pub async fn send_request(&self, pg_client: &PgClient) -> Result<(), Error> {
-        let task = Task::first_waiting(pg_client).await?;
+    pub async fn send_request(&self) -> Result<(), Error> {
+        let client = PgConnect::connect_pg_from_env().await.unwrap();
+        let task = Task::first_waiting(&client).await?;
         update_last_tdlib_call(task.request);
-        task.to_pending(pg_client).await?;
+        task.to_pending(&client).await?;
         // tokio::time::sleep(Duration::from_secs(1)).await;
         send(self.client_id, &task.message);
         Ok(())
     }
 
-    pub async fn start(client_id: ClientId, pg_client: &PgClient) -> Result<(), Error> {
-        loop {
-            let td_manager = Self::init(client_id);
-            info!("Td manager");
-            td_manager.send_request(pg_client).await?;
-            info!("Td send");
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        }
-        Ok(())
-    }
+    // pub async fn start(client_id: ClientId, pg_client: &PgClient) -> Result<(), Error> {
+    //     loop {
+    //         let td_manager = Self::init(client_id);
+    //         info!("Td manager");
+    //         td_manager.send_request(pg_client).await?;
+    //         info!("Td send");
+    //         tokio::time::sleep(Duration::from_secs(1)).await;
+    //     }
+    //     Ok(())
+    // }
 
     // pub fn receive_webhook(&mut self, incoming: &str) {
     //     let message = self.current_task.message();

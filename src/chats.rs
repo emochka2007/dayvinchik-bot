@@ -1,5 +1,5 @@
 use log::debug;
-use rust_tdlib::types::{Chat, GetChat as TdGetChat, GetChatHistory as TdGetChatHistory, GetChats};
+use rust_tdlib::types::{Chat, GetChat as TdGetChat, GetChatHistory as TdGetChatHistory, GetChats, Message};
 use serde_json::{Value, Error as SerdeError};
 use tokio_postgres::Error;
 use uuid::Uuid;
@@ -18,31 +18,46 @@ pub struct ChatMeta {
     id: Uuid,
     chat_id: ChatId,
     last_read_message_id: MessageId,
+    title: String,
+    last_message_id: MessageId,
 }
 impl ChatMeta {
-    pub fn new(chat_id: ChatId, last_read_message_id: MessageId) -> Self {
+    pub fn new(chat_id: ChatId, last_read_message_id: MessageId, last_message_id: MessageId, title: String) -> Self {
         Self {
             id: Uuid::new_v4(),
             chat_id,
+            title,
             last_read_message_id,
+            last_message_id,
         }
     }
     pub async fn insert_db(&self, client: &PgClient) -> () {
         let query = "INSERT INTO chats (\
         id, \
         chat_id, \
-        last_read_message_id) \
-    VALUES ($1,$2, $3) ON CONFLICT (chat_id) \
+        last_read_message_id,\
+        last_message_id,\
+        title) \
+    VALUES ($1,$2, $3, $4,$5) ON CONFLICT (chat_id) \
    DO UPDATE SET last_read_message_id = EXCLUDED.last_read_message_id";
-        client.query(query, &[&self.id, &self.chat_id, &self.last_read_message_id]).await.unwrap();
+        client.query(query,
+                     &[
+                         &self.id,
+                         &self.chat_id,
+                         &self.last_read_message_id,
+                         &self.last_message_id,
+                         &self.title])
+            .await.unwrap();
     }
     pub async fn select_by_chat_id(chat_id: i64, client: &PgClient) -> Result<Self, Error> {
         let query = "SELECT * from chats WHERE chat_id = $1 LIMIT 1";
         let row = client.query_one(query, &[&chat_id]).await?;
         Ok(Self {
             id: row.try_get("id")?,
+            title: row.try_get("title")?,
             last_read_message_id: row.try_get("last_read_message_id")?,
             chat_id: row.try_get("chat_id")?,
+            last_message_id: row.try_get("last_message_id")?,
         })
     }
 }
@@ -72,10 +87,25 @@ pub async fn td_chat_info(pg_client: &PgClient, chat_id: ChatId) {
     task.insert_db(pg_client).await.unwrap();
 }
 
-pub async fn get_chat(json_str: Value, pg_client: &PgClient) -> Result<ChatMeta, SerdeError> {
+pub async fn get_chat(json_str: Value, pg_client: &PgClient) -> Result<Option<ChatMeta>, SerdeError> {
     let chat: Chat = serde_json::from_value(json_str)?;
-    let chat_meta = ChatMeta::new(chat.id(), chat.last_read_inbox_message_id());
+    // if chat.id < 0 - it's a channel we cannot write to
+    if chat.id() < 0 {
+        return Ok(None);
+    }
+    let last_message = chat.last_message().as_ref().unwrap();
+    let mut last_received_message_id = last_message.id();
+    // if message is outgoing, then it means that we've sent
+    if last_message.is_outgoing() {
+        last_received_message_id = 0;
+    }
+    let chat_meta = ChatMeta::new(
+        chat.id(),
+        chat.last_read_inbox_message_id(),
+        last_received_message_id,
+        chat.title().to_string(),
+    );
     chat_meta.insert_db(pg_client).await;
     debug!("{:?}", chat_meta);
-    Ok(chat_meta)
+    Ok(Some(chat_meta))
 }

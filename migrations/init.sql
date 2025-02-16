@@ -14,6 +14,8 @@ CREATE table if not exists chats
     chat_id              bigint unique,
     -- mb unique --
     last_read_message_id bigint,
+    last_message_id      bigint,
+    title                text,
     created_at           TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
     updated_at           TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp
 );
@@ -79,7 +81,7 @@ Create table if not exists tasks
     message    text,
     -- WAITING, COMPLETED
     status     text                                 DEFAULT 'WAITING',
-    request text,
+    request    text,
     response   text,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp
