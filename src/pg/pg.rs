@@ -1,7 +1,7 @@
+use deadpool_postgres::{Config, Manager, ManagerConfig, Pool, RecyclingMethod, Runtime};
+use log::info;
 use std::env;
 use std::env::VarError;
-use deadpool_postgres::{Pool, Config, Runtime, Manager, ManagerConfig, RecyclingMethod};
-use log::{info};
 use tokio_postgres::{Client, NoTls};
 const WORKERS: usize = 16;
 const ITERATIONS: usize = 1000;
@@ -52,8 +52,10 @@ impl PgConnect {
         self
     }
     pub async fn connect(&self) -> std::io::Result<Client> {
-        let conn_str = format!("host={} user={} password={} dbname={} port={}",
-                               self.host, self.user, self.password, self.dbname, self.port);
+        let conn_str = format!(
+            "host={} user={} password={} dbname={} port={}",
+            self.host, self.user, self.password, self.dbname, self.port
+        );
         let (client, connection) = tokio_postgres::connect(&conn_str, NoTls).await.unwrap();
         tokio::spawn(async move {
             if let Err(e) = connection.await {
@@ -73,9 +75,11 @@ impl PgConnect {
         cfg.user = Some(self.user.clone());
         cfg.dbname = Some(self.dbname.clone());
         cfg.manager = Some(ManagerConfig {
-            recycling_method: RecyclingMethod::Fast
+            recycling_method: RecyclingMethod::Fast,
         });
-        let pool = cfg.create_pool(Some(Runtime::Tokio1), NoTls).expect("Failed to create pool");
+        let pool = cfg
+            .create_pool(Some(Runtime::Tokio1), NoTls)
+            .expect("Failed to create pool");
         pool
     }
 
@@ -86,7 +90,8 @@ impl PgConnect {
             .host(env::var("PG_HOST").unwrap())
             .user(env::var("PG_USER").unwrap())
             .port(env::var("PG_PORT").unwrap())
-            .connect().await
+            .connect()
+            .await
     }
     pub async fn create_pool_from_env() -> Result<Pool, VarError> {
         let pool = PgConnect::new()
@@ -95,10 +100,11 @@ impl PgConnect {
             .host(env::var("PG_HOST")?)
             .user(env::var("PG_USER")?)
             .port(env::var("PG_PORT")?)
-            .create_pool().await;
+            .create_pool()
+            .await;
         Ok(pool)
     }
-    pub async fn run_migrations(client: &PgClient) {
+    pub async fn run_migrations(client: &Client) {
         // todo get dynamically from folder
         let migration_files = vec!["migrations/init.sql"];
         for file in migration_files {

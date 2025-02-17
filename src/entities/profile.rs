@@ -1,14 +1,18 @@
+/**
+- Dayvinchik interaction
+- Actions:
+*/
 #[derive(Debug)]
-pub struct MyProfile {
+pub struct Profile {
     name: String,
-    age: i16
+    age: i16,
 }
 
-impl MyProfile {
+impl Profile {
     pub fn _new() -> Self {
         Self {
             name: "Nikita".to_string(),
-            age: 23
+            age: 23,
         }
     }
 }

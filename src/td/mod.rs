@@ -1,14 +1,15 @@
-use std::env;
+use crate::file::get_project_root;
+use crate::td::td_json::{send, ClientId};
 use serde::Serialize;
 use serde_json::Value;
-use crate::td::td_json::{send, ClientId};
+use std::env;
 
-pub mod td_message;
-pub mod td_json;
-pub mod td_file;
 pub mod read;
-pub mod td_manager;
 pub mod td_command_map;
+pub mod td_file;
+pub mod td_json;
+pub mod td_manager;
+pub mod td_message;
 pub mod td_request;
 pub mod td_response;
 
@@ -30,9 +31,9 @@ pub struct TDLibParams {
     pub(crate) enable_storage_optimizer: bool,
     pub(crate) ignore_file_names: bool,
 }
-pub fn init_tdlib_params(client_id: ClientId){
+pub fn init_tdlib_params(client_id: ClientId) {
     // use custom dir for storing artefacts that tdlib creates in dev
-    let root = project_root::get_project_root().unwrap();
+    let root = get_project_root().unwrap();
     let artefacts_dir = format!("{}/../td/tdlib_artefacts", root.to_str().unwrap());
 
     // set tdlib params
@@ -69,7 +70,7 @@ pub fn init_tdlib_params(client_id: ClientId){
         }
         v => v.clone(),
     }
-        .to_string();
+    .to_string();
 
     send(client_id, &params_json);
 }

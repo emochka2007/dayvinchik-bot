@@ -1,10 +1,10 @@
 pub struct Prompt {
     pub system: Option<String>,
-    pub user: String
+    pub user: String,
 }
 pub enum _Genders {
     MAN(String),
-    WOMAN(String)
+    WOMAN(String),
 }
 impl Prompt {
     //todo receive profile
@@ -22,17 +22,18 @@ Overall Impression: Summarize your findings based on the visual elements observe
 After analyzing these elements, provide a confidence score from 1 to 100 on whether the character can be considered 'alternative'.
 Please return just a number for the first photo, only number.
 ".to_string();
-        let any_desc =sys_description.to_string();
+        let any_desc = sys_description.to_string();
         Self {
             system: Some(sys_description),
-            user: any_desc
+            user: any_desc,
         }
     }
 
     //todo receive profile and actor
     pub fn main(inbox_msg: &str) -> Self {
         // todo chosen actor and MyProfile
-        let sys_prompt = format!("\
+        let sys_prompt = format!(
+            "\
 Act as a 20-year-old man from Russia. You are sociable and friendly, looking to
 connect with a potential girlfriend.
 Your responses should be concise and polite, demonstrating respect and interest in the conversation.
@@ -40,10 +41,12 @@ Use simple language and keep your messages clear and to the point,
 while ensuring they are engaging and considerate of the other person's feelings.
 Here's the message from person: {}
 Respond in Russian.)
-        ", inbox_msg);
+        ",
+            inbox_msg
+        );
         Self {
             system: None,
-            user: sys_prompt
+            user: sys_prompt,
         }
     }
 }

@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
 use crate::errors::GeneralError;
 use crate::file::read_json_file;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SuperLike {

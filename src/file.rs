@@ -1,14 +1,31 @@
-use std::{fs, io};
-use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
-use base64::{Engine};
 use base64::prelude::BASE64_STANDARD;
+use base64::Engine;
+use std::ffi::OsString;
+use std::fs::{read_dir, File, OpenOptions};
+use std::io::{Read, Write};
+use std::path::PathBuf;
+use std::{env, fs, io};
 
-pub fn file_log(data: String){
+pub fn get_project_root() -> io::Result<PathBuf> {
+    let path = env::current_dir()?;
+    let mut path_ancestors = path.as_path().ancestors();
+
+    while let Some(p) = path_ancestors.next() {
+        let has_cargo = read_dir(p)?
+            .into_iter()
+            .any(|p| p.unwrap().file_name() == OsString::from("Cargo.lock"));
+        if has_cargo {
+            return Ok(PathBuf::from(p));
+        }
+    }
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        "Ran out of places to find Cargo.toml",
+    ))
+}
+pub fn file_log(data: String) {
     let mut write_context = File::create("teleterm.json").unwrap();
-    write_context
-        .write_all(data.as_bytes())
-        .unwrap();
+    write_context.write_all(data.as_bytes()).unwrap();
 }
 
 pub fn log_append(data: String, path: &str) -> std::io::Result<()> {
@@ -22,7 +39,7 @@ pub fn log_append(data: String, path: &str) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn read_json_file (path: &str) -> io::Result<String> {
+pub fn read_json_file(path: &str) -> io::Result<String> {
     let mut file = File::open(path)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;

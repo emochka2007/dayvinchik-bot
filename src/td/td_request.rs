@@ -9,7 +9,9 @@ pub enum RequestKeys {
     DownloadFile,
     GetChat,
     GetChats,
+    SendMessage,
     Unknown,
+    OpenChat,
 }
 impl RequestKeys {
     pub fn to_str(&self) -> &str {
@@ -19,7 +21,9 @@ impl RequestKeys {
             RequestKeys::GetChat => "getChat",
             RequestKeys::SearchPublicChat => "searchPublicChat",
             RequestKeys::Unknown => "unknown",
-            RequestKeys::GetChats => "getChats"
+            RequestKeys::GetChats => "getChats",
+            RequestKeys::SendMessage => "sendMessage",
+            RequestKeys::OpenChat => "openChat",
         }
     }
     pub fn from_str(data: &str) -> io::Result<Self> {
@@ -27,8 +31,10 @@ impl RequestKeys {
             "getChatHistory" => Ok(RequestKeys::GetChatHistory),
             "downloadFile" => Ok(RequestKeys::DownloadFile),
             "getChat" => Ok(RequestKeys::GetChat),
-            "searchPubliChat" => Ok(RequestKeys::SearchPublicChat),
-            _ => Ok(RequestKeys::Unknown)
+            "searchPublicChat" => Ok(RequestKeys::SearchPublicChat),
+            "sendMessage" => Ok(RequestKeys::SendMessage),
+            "openChat" => Ok(RequestKeys::OpenChat),
+            _ => Ok(RequestKeys::Unknown),
         }
     }
 }
@@ -41,12 +47,13 @@ impl FromSql<'_> for RequestKeys {
             "getChat" => Ok(RequestKeys::GetChat),
             "searchPubliChat" => Ok(RequestKeys::SearchPublicChat),
             "getChats" => Ok(RequestKeys::GetChats),
-            _ => Ok(RequestKeys::Unknown)
+            "openChat" => Ok(RequestKeys::OpenChat),
+            _ => Ok(RequestKeys::Unknown),
         }
     }
 
     //todo fix type
-    fn accepts(ty: &Type) -> bool {
+    fn accepts(_ty: &Type) -> bool {
         true
     }
 }

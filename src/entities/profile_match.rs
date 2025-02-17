@@ -1,5 +1,5 @@
-use tokio_postgres::{Error};
 use crate::pg::pg::PgClient;
+use tokio_postgres::Error;
 
 #[derive(Debug)]
 pub struct ProfileMatch {

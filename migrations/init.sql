@@ -91,3 +91,14 @@ CREATE OR REPLACE TRIGGER set_timestamp
     ON tasks
     FOR EACH ROW
 EXECUTE FUNCTION update_timestamp();
+
+Create table if not exists superlikes
+(
+    id                  uuid primary key                     default uuid_generate_v4(),
+    message             text,
+    -- WAITING, COMPLETED
+    profile_reviewer_id uuid references profile_reviewers,
+    status              text                                 DEFAULT 'WAITING',
+    created_at          TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
+    updated_at          TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp
+)

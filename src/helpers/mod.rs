@@ -1,6 +1,6 @@
-use std::io;
 use image::Luma;
 use qrcode::QrCode;
+use std::io;
 
 fn _generate_qr_code(link: &str) {
     let code = QrCode::new(link.as_bytes()).unwrap();
@@ -14,4 +14,3 @@ pub fn input() -> io::Result<String> {
     io::stdin().read_line(&mut buffer)?;
     Ok(buffer)
 }
-

@@ -1,7 +1,7 @@
+use serde::Deserialize;
 use std::error::Error;
 use std::io;
 use std::io::ErrorKind;
-use serde::Deserialize;
 use tokio_postgres::types::{FromSql, Type};
 
 #[derive(Eq, Hash, PartialEq, Debug, Deserialize)]
@@ -10,6 +10,8 @@ pub enum ResponseKeys {
     Chat,
     UpdateFile,
     Chats,
+    Ok,
+    UpdateChatReadInbox,
     //todo unknown
 }
 impl ResponseKeys {
@@ -18,7 +20,9 @@ impl ResponseKeys {
             ResponseKeys::Messages => String::from("messages"),
             ResponseKeys::Chat => String::from("chat"),
             ResponseKeys::UpdateFile => String::from("updateFile"),
-            ResponseKeys::Chats => String::from("chats")
+            ResponseKeys::Chats => String::from("chats"),
+            ResponseKeys::UpdateChatReadInbox => String::from("updateChatReadInbox"),
+            ResponseKeys::Ok => String::from("ok")
         }
     }
     pub fn from_str(data: &str) -> io::Result<Self> {
@@ -27,7 +31,12 @@ impl ResponseKeys {
             "messages" => Ok(ResponseKeys::Messages),
             "chat" => Ok(ResponseKeys::Chat),
             "updateFile" => Ok(ResponseKeys::UpdateFile),
-            _ => Err(io::Error::new(ErrorKind::InvalidInput, "Unknown response key"))
+            "updateChatReadInbox" => Ok(ResponseKeys::UpdateChatReadInbox),
+            "ok" => Ok(ResponseKeys::Ok),
+            _ => Err(io::Error::new(
+                ErrorKind::InvalidInput,
+                "Unknown response key",
+            )),
         }
     }
 }
@@ -39,7 +48,9 @@ impl FromSql<'_> for ResponseKeys {
             "messages" => Ok(ResponseKeys::Messages),
             "chat" => Ok(ResponseKeys::Chat),
             "updateFile" => Ok(ResponseKeys::UpdateFile),
-            _ => panic!("From sql error")
+            "updateChatReadInbox" => Ok(ResponseKeys::UpdateChatReadInbox),
+            "ok" => Ok(ResponseKeys::Ok),
+            _ => Err(io::Error::new(ErrorKind::InvalidInput, "Unknown response key").into()),
         }
     }
 
@@ -48,4 +59,3 @@ impl FromSql<'_> for ResponseKeys {
         true
     }
 }
-

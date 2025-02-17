@@ -1,15 +1,14 @@
+use crate::common::{ChatId, FileId, MessageId};
+use crate::entities::profile_match::ProfileMatch;
+use crate::entities::profile_reviewer::{ProfileReviewer, ProfileReviewerStatus};
+use crate::pg::pg::PgClient;
+use crate::td::td_file::td_file_download;
 use log::{debug, error};
 use rust_tdlib::tdjson::ClientId;
 use rust_tdlib::types::{Chat, Message, MessageContent, Messages, TextEntity, TextEntityType};
 use serde_json::Value;
 use tokio_postgres::Error;
 use uuid::Uuid;
-use crate::common::{ChatId, FileId, MessageId};
-use crate::constants::update_last_message;
-use crate::entities::profile_match::ProfileMatch;
-use crate::entities::profile_reviewer::{ProfileReviewer, ProfileReviewerStatus};
-use crate::pg::pg::PgClient;
-use crate::td::td_file::td_file_download;
 
 #[derive(Debug, Clone)]
 pub struct MessageMeta {
@@ -27,7 +26,9 @@ impl MessageMeta {
     pub fn from_message(msg: &Message, last_read_inbox_message_id: Option<MessageId>) -> Self {
         let mut is_read = true;
         if !msg.is_outgoing() {
-            if last_read_inbox_message_id.is_some() && msg.id() > last_read_inbox_message_id.unwrap() {
+            if last_read_inbox_message_id.is_some()
+                && msg.id() > last_read_inbox_message_id.unwrap()
+            {
                 is_read = false;
             }
         }
@@ -76,13 +77,19 @@ impl MessageMeta {
         text,\
         url)\
         VALUES ($1, $2, $3, $4, $5, $6)";
-        client.query(query, &[
-            &id,
-            &self.chat_id,
-            &self.message_id,
-            &self.is_read,
-            &self.text,
-            &self.url]).await?;
+        client
+            .query(
+                query,
+                &[
+                    &id,
+                    &self.chat_id,
+                    &self.message_id,
+                    &self.is_read,
+                    &self.text,
+                    &self.url,
+                ],
+            )
+            .await?;
         Ok(())
     }
 }
@@ -100,6 +107,7 @@ pub fn match_message_content(msg_content: MessageContent) -> std::io::Result<Par
         text: String::from("unmatched"),
     };
     let mut file_ids = Vec::new();
+    debug!("110: {:?}", msg_content);
     match msg_content {
         // If video just send only caption
         MessageContent::MessageVideo(content) => {
@@ -140,7 +148,7 @@ fn get_url_entity(entities: &Vec<TextEntity>, content: &mut ParseMessageContent)
     }
 }
 
-pub async fn chat_history(client_id: ClientId, json_str: Value, pg_client: &PgClient) -> Result<(), serde_json::Error> {
+pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<(), serde_json::Error> {
     let messages: Messages = serde_json::from_value(json_str)?;
 
     for message in messages.messages() {
@@ -154,19 +162,25 @@ pub async fn chat_history(client_id: ClientId, json_str: Value, pg_client: &PgCl
             };
             profile_match.insert_db(pg_client).await.unwrap();
         }
-        debug!("{:?}", parsed_message);
+        debug!("Parsed message {:?}", parsed_message);
         //todo if profile_reviwer active
         let file_ids = parsed_message.file_ids();
         if !parsed_message.text().is_empty() & &file_ids.is_some() {
             if file_ids.clone().unwrap().iter().len() > 0 {
                 let mut profile_reviewer = ProfileReviewer::new(
-                    message.chat_id(), parsed_message.text(), ProfileReviewerStatus::PENDING);
-                profile_reviewer.set_file_ids(Some(parsed_message.file_ids().as_ref().unwrap().clone()));
-                profile_reviewer.insert_db(pg_client).await.expect("TODO: panic message");
-                td_file_download(client_id, profile_reviewer.main_file())?;
+                    message.chat_id(),
+                    parsed_message.text(),
+                    ProfileReviewerStatus::PENDING,
+                );
+                profile_reviewer
+                    .set_file_ids(Some(parsed_message.file_ids().as_ref().unwrap().clone()));
+                profile_reviewer
+                    .insert_db(pg_client)
+                    .await
+                    .expect("TODO: panic message");
+                td_file_download(pg_client, profile_reviewer.main_file()).await?;
             }
         }
-        // update_last_message(message.id());
     }
     Ok(())
 }

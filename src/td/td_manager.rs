@@ -1,15 +1,15 @@
-use std::time::Duration;
-use log::{debug, error, info};
-use rust_tdlib::tdjson::ClientId;
-use tokio_postgres::{Client, Error, Row};
-use uuid::Uuid;
 use crate::constants::update_last_tdlib_call;
 use crate::pg::pg::{PgClient, PgConnect};
 use crate::td::td_json::send;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
+use log::{debug, error, info};
+use rust_tdlib::tdjson::ClientId;
+use std::time::Duration;
+use tokio_postgres::{Client, Error, Row};
+use uuid::Uuid;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct TdManager {
     client_id: ClientId,
 }
@@ -58,15 +58,22 @@ impl Task {
     pub fn response(&self) -> &ResponseKeys {
         &self.response
     }
-    pub fn new(message: String, response: ResponseKeys, request: RequestKeys) -> Self {
+    pub async fn new(
+        message: String,
+        request: RequestKeys,
+        response: ResponseKeys,
+        pg_client: &PgClient,
+    ) -> Result<Self, Error> {
         let id = Uuid::new_v4();
-        Self {
+        let task = Self {
             id,
             message,
             response,
             request,
             status: TaskStatus::WAITING,
-        }
+        };
+        task.insert_db(pg_client).await?;
+        Ok(task)
     }
     pub async fn insert_db(&self, pg_client: &PgClient) -> Result<(), Error> {
         debug!("{:?}", self);
@@ -74,12 +81,18 @@ impl Task {
         (id, message, status, response,request)
         VALUES
         ($1, $2, $3, $4, $5)";
-        pg_client.query(query, &[
-            &self.id,
-            &self.message,
-            &self.status.to_str(),
-            &self.response.to_str(),
-            &self.request.to_str()]).await?;
+        pg_client
+            .query(
+                query,
+                &[
+                    &self.id,
+                    &self.message,
+                    &self.status.to_str(),
+                    &self.response.to_str(),
+                    &self.request.to_str(),
+                ],
+            )
+            .await?;
         Ok(())
     }
     pub fn message(&self) -> &String {
@@ -95,18 +108,18 @@ impl Task {
             response: row.try_get("response")?,
         })
     }
-    pub async fn first_waiting(pg_client: &Client) -> Result<Self, Error> {
-        let query = "SELECT * from tasks WHERE status='WAITING' LIMIT 1";
+    pub async fn first_waiting(pg_client: &PgClient) -> Result<Self, Error> {
+        let query = "SELECT * from tasks WHERE status='WAITING' ORDER BY created_at LIMIT 1";
         let row = pg_client.query_one(query, &[]).await?;
         Self::parse_row(row)
     }
     pub async fn first_pending(pg_client: &PgClient) -> Result<Self, Error> {
-        let query = "SELECT * from tasks WHERE status='PENDING' LIMIT 1";
+        let query = "SELECT * from tasks WHERE status='PENDING' ORDER BY created_at LIMIT 1";
         let row = pg_client.query_one(query, &[]).await?;
         Self::parse_row(row)
     }
 
-    pub async fn to_pending(&self, pg_client: &Client) -> Result<(), Error> {
+    pub async fn to_pending(&self, pg_client: &PgClient) -> Result<(), Error> {
         let query = "UPDATE tasks SET status='PENDING' \
         WHERE id = $1";
         pg_client.query(query, &[self.id()]).await?;
@@ -124,16 +137,13 @@ Pulls from db events and executes them
 */
 impl TdManager {
     pub fn init(client_id: ClientId) -> Self {
-        Self {
-            client_id,
-        }
+        Self { client_id }
     }
 
-    pub async fn send_request(&self) -> Result<(), Error> {
-        let client = PgConnect::connect_pg_from_env().await.unwrap();
-        let task = Task::first_waiting(&client).await?;
+    pub async fn send_request(&self, pg_client: &PgClient) -> Result<(), Error> {
+        let task = Task::first_waiting(pg_client).await?;
         update_last_tdlib_call(task.request);
-        task.to_pending(&client).await?;
+        task.to_pending(pg_client).await?;
         // tokio::time::sleep(Duration::from_secs(1)).await;
         send(self.client_id, &task.message);
         Ok(())
@@ -158,4 +168,3 @@ impl TdManager {
     //         }
     //     }
 }
-

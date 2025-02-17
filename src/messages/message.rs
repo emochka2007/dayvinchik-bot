@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -25,7 +25,7 @@ pub struct FormattedText {
 
 //todo implement serialize
 impl SendMessage {
-    pub fn skip(chat_id: &str) -> Self {
+    pub fn dislike(chat_id: &str) -> Self {
         let message = SendMessage {
             t: "sendMessage".to_string(),
             chat_id: chat_id.to_string(),
@@ -53,6 +53,7 @@ impl SendMessage {
         };
         message
     }
+    //todo mb rename
     pub fn super_like(chat_id: &str) -> Self {
         let message = SendMessage {
             t: "sendMessage".to_string(),

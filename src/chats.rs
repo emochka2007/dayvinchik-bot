@@ -1,17 +1,17 @@
-use log::debug;
-use rust_tdlib::types::{Chat, GetChat as TdGetChat, GetChatHistory as TdGetChatHistory, GetChats, Message};
-use serde_json::{Value, Error as SerdeError};
-use tokio_postgres::Error;
-use uuid::Uuid;
 use crate::common::{ChatId, MessageId};
-use crate::constants::{get_last_message, update_last_tdlib_call};
 use crate::pg::pg::PgClient;
-use crate::td::td_manager::Task;
 use crate::td::td_json::{send, ClientId};
+use crate::td::td_manager::Task;
 use crate::td::td_message::MessageMeta;
 use crate::td::td_request::RequestKeys;
-use crate::td::td_request::RequestKeys::{GetChat, GetChatHistory};
 use crate::td::td_response::ResponseKeys;
+use log::{debug, error, info};
+use rust_tdlib::types::{
+    Chat, GetChat as TdGetChat, GetChatHistory as TdGetChatHistory, GetChats, Message, OpenChat,
+};
+use serde_json::{Error as SerdeError, Value};
+use tokio_postgres::Error;
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct ChatMeta {
@@ -22,7 +22,23 @@ pub struct ChatMeta {
     last_message_id: MessageId,
 }
 impl ChatMeta {
-    pub fn new(chat_id: ChatId, last_read_message_id: MessageId, last_message_id: MessageId, title: String) -> Self {
+    pub fn chat_id(&self) -> &ChatId {
+        &self.chat_id
+    }
+
+    pub fn last_read_message_id(&self) -> &MessageId {
+        &self.last_read_message_id
+    }
+    pub fn last_message_id(&self) -> &MessageId {
+        &self.last_message_id
+    }
+
+    pub fn new(
+        chat_id: ChatId,
+        last_read_message_id: MessageId,
+        last_message_id: MessageId,
+        title: String,
+    ) -> Self {
         Self {
             id: Uuid::new_v4(),
             chat_id,
@@ -39,15 +55,21 @@ impl ChatMeta {
         last_message_id,\
         title) \
     VALUES ($1,$2, $3, $4,$5) ON CONFLICT (chat_id) \
-   DO UPDATE SET last_read_message_id = EXCLUDED.last_read_message_id";
-        client.query(query,
-                     &[
-                         &self.id,
-                         &self.chat_id,
-                         &self.last_read_message_id,
-                         &self.last_message_id,
-                         &self.title])
-            .await.unwrap();
+   DO UPDATE SET last_read_message_id = EXCLUDED.last_read_message_id, \
+   last_message_id = EXCLUDED.last_message_id ";
+        client
+            .query(
+                query,
+                &[
+                    &self.id,
+                    &self.chat_id,
+                    &self.last_read_message_id,
+                    &self.last_message_id,
+                    &self.title,
+                ],
+            )
+            .await
+            .unwrap();
     }
     pub async fn select_by_chat_id(chat_id: i64, client: &PgClient) -> Result<Self, Error> {
         let query = "SELECT * from chats WHERE chat_id = $1 LIMIT 1";
@@ -65,30 +87,57 @@ impl ChatMeta {
 pub async fn td_get_chats(pg_client: &PgClient) {
     let public_chats = GetChats::builder().limit(100).build();
     let message = serde_json::to_string(&public_chats).unwrap();
-    let task = Task::new(message, ResponseKeys::Chats, RequestKeys::GetChats);
-    task.insert_db(pg_client).await.unwrap();
+    Task::new(
+        message,
+        RequestKeys::GetChats,
+        ResponseKeys::Chats,
+        pg_client,
+    )
+        .await
+        .unwrap();
 }
 
-pub fn td_chat_history(client_id: ClientId, chat_id: i64, limit: i32) {
-    let last_msg_id = get_last_message();
-    let message = TdGetChatHistory::builder()
+pub async fn td_get_last_message(
+    pg_client: &PgClient,
+    chat_id: ChatId,
+    limit: i32,
+) -> Result<(), SerdeError> {
+    let history_message = TdGetChatHistory::builder()
         .chat_id(chat_id)
-        .from_message_id(last_msg_id)
-        .limit(limit).build();
-    let chat_history_msg = serde_json::to_string(&message).unwrap();
-    send(client_id, &chat_history_msg);
-    update_last_tdlib_call(GetChatHistory);
+        .from_message_id(0)
+        .limit(limit)
+        .build();
+    let message = serde_json::to_string(&history_message)?;
+    Task::new(
+        message,
+        RequestKeys::GetChatHistory,
+        ResponseKeys::Messages,
+        pg_client,
+    )
+        .await
+        .unwrap();
+    Ok(())
 }
+
 pub async fn td_chat_info(pg_client: &PgClient, chat_id: ChatId) {
     let message = TdGetChat::builder().chat_id(chat_id).build();
     let chat_history_msg = serde_json::to_string(&message).unwrap();
-    // update_last_tdlib_call(GetChat);
-    let task = Task::new(chat_history_msg, ResponseKeys::Chat, GetChat);
-    task.insert_db(pg_client).await.unwrap();
+    Task::new(
+        chat_history_msg,
+        RequestKeys::GetChat,
+        ResponseKeys::Chat,
+        pg_client,
+    )
+        .await
+        .unwrap();
 }
 
-pub async fn get_chat(json_str: Value, pg_client: &PgClient) -> Result<Option<ChatMeta>, SerdeError> {
+pub async fn get_chat(
+    json_str: Value,
+    pg_client: &PgClient,
+) -> Result<Option<ChatMeta>, SerdeError> {
     let chat: Chat = serde_json::from_value(json_str)?;
+    info!("Get chat");
     // if chat.id < 0 - it's a channel we cannot write to
     if chat.id() < 0 {
         return Ok(None);
@@ -108,4 +157,17 @@ pub async fn get_chat(json_str: Value, pg_client: &PgClient) -> Result<Option<Ch
     chat_meta.insert_db(pg_client).await;
     debug!("{:?}", chat_meta);
     Ok(Some(chat_meta))
+}
+
+pub async fn td_open_chat(pg_client: &PgClient, chat_id: ChatId) -> Result<(), Error> {
+    let message = OpenChat::builder().chat_id(chat_id).build();
+    let chat_history_msg = serde_json::to_string(&message).unwrap();
+    Task::new(
+        chat_history_msg,
+        RequestKeys::OpenChat,
+        ResponseKeys::Ok,
+        pg_client,
+    )
+        .await?;
+    Ok(())
 }
