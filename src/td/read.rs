@@ -1,97 +1,144 @@
-use crate::chats::{get_chat, td_get_last_message, td_chat_info, ChatMeta};
-use crate::constants::get_last_tdlib_call;
-use crate::entities::profile_match::ProfileMatch;
-use crate::entities::profile_reviewer::{ProfileReviewer, ProfileReviewerStatus};
+use crate::chats::{get_chat, td_chat_info};
+use crate::constants::get_last_request;
 use crate::file::move_file;
 use crate::pg::pg::PgClient;
-use crate::td::td_file::td_file_download;
-use crate::td::td_json::ClientId;
 use crate::td::td_manager::Task;
-use crate::td::td_message::{chat_history, MessageMeta};
+use crate::td::td_message::chat_history;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
-use log::{debug, info};
-use rust_tdlib::types::{Chat, Chats, Messages, UpdateFile};
+use log::{debug, error, info};
+use rust_tdlib::types::{Chats, UpdateFile};
 use serde_json::Value;
-use std::cmp::PartialEq;
-use std::thread::sleep;
-use std::time::Duration;
+use tokio::time::{sleep, Duration};
 use tokio_postgres::Client;
 
-pub async fn parse_message(
-    json_str: &str,
-    client_id: ClientId,
-    pg_client: &PgClient,
-) -> std::io::Result<()> {
-    let json_value: Value = serde_json::from_str(json_str)?;
-    match json_value.get("@type") {
-        Some(td_type) => {
-            let td_type = td_type.as_str().unwrap();
-            info!("Td_type {td_type}");
-            match ResponseKeys::from_str(td_type) {
-                Ok(key) => {
-                    debug!("Key {:?}", key);
-                    let last_tdlib_call = get_last_tdlib_call();
-                    debug!("Last tdlib call {:?}", last_tdlib_call);
-                    todo search by status and response and then only finish it
-                    let last_pending = Task::first_pending(pg_client).await.unwrap_or_default();
-                    if *last_pending.request() == last_tdlib_call && key == *last_pending.response()
-                    {
-                        last_pending.to_complete(pg_client).await.unwrap();
-                    }
-                    match last_tdlib_call {
-                        RequestKeys::GetChats => {
-                            if key == ResponseKeys::Chats {
-                                info!("GetChats");
-                                let chats: Chats = serde_json::from_value(json_value)?;
-                                let chats_list = chats.chat_ids();
-                                for chat in chats_list {
-                                    debug!("{chat}");
-                                    td_chat_info(pg_client, *chat).await;
-                                    // td_chat_history(client_id, *chat, 1);
-                                }
-                            }
-                        }
-                        RequestKeys::GetChatHistory => {
-                            if key == ResponseKeys::Messages {
-                                chat_history(json_value, pg_client).await?
-                            }
-                        }
-                        RequestKeys::GetChat => {
-                            if key == ResponseKeys::Chat {
-                                get_chat(json_value, pg_client).await?;
-                            }
-                        }
-                        RequestKeys::SearchPublicChat => {
-                            if json_value["@type"] == "chat" {
-                                // let chat: Chat = serde_json::from_value(parsed)?;
-                                // let id = chat.id();
-                            }
-                        }
-                        RequestKeys::DownloadFile => {
-                            //todo overwrite in case of multi-file support
-                            if key == ResponseKeys::UpdateFile {
-                                let update_file: UpdateFile = serde_json::from_value(json_value)?;
-                                let path = update_file.file().local().path();
-                                // let last_pending =
-                                //     ProfileReviewer::get_waiting(pg_client).await.unwrap();
-                                debug!("Path {path}");
-                                if !path.is_empty() {
-                                    let new_path =
-                                        format!("profile_images/{}.png", update_file.file().id());
-                                    move_file(path, &new_path)?;
-                                }
-                            }
-                        }
-                        _ => {
-                            // error!("Unknown last_tdlib_call {}", last_tdlib_call.as_str());
-                        }
-                    }
-                }
-                Err(..) => {}
+pub async fn parse_message(json_str: &str, pg_client: &PgClient) -> std::io::Result<()> {
+    let json_value: Value = match serde_json::from_str(json_str) {
+        Ok(value) => value,
+        Err(e) => {
+            error!("Failed to parse JSON string: {e}");
+            return Ok(());
+        }
+    };
+
+    // Check if @type exists and is a string
+    let td_type = match json_value.get("@type").and_then(|v| v.as_str()) {
+        Some(t) => t,
+        None => {
+            debug!("No @type field in the incoming JSON. Ignoring.");
+            return Ok(());
+        }
+    };
+
+    info!("Td_type: {td_type}");
+
+    // Convert td_type (string) to our enum. If it fails, we can’t process further.
+    let response_key = match ResponseKeys::from_str(td_type) {
+        Ok(rk) => rk,
+        Err(_e) => {
+            debug!("Unrecognized or unsupported td_type: {td_type}. Ignoring.");
+            return Ok(());
+        }
+    };
+
+    debug!("Key: {:?}", response_key);
+
+    // This is your “last request” logic; adjust as needed.
+    let last_tdlib_call = get_last_request();
+    debug!("Last tdlib call: {:?}", last_tdlib_call);
+
+    // Attempt to find a “pending” Task that matches the last request + response
+    let task_result = Task::first_pending(pg_client, &last_tdlib_call, &response_key).await;
+    let last_pending = match task_result {
+        Ok(task) => {
+            debug!("Pending task found: {:?}", task);
+            Some(task)
+        }
+        Err(e) => {
+            // No matching pending tasks or DB error
+            error!("No pending Task found or DB error: {e}");
+            error!("Response key: {:?}", response_key);
+            error!("Td type: {:?}", last_tdlib_call);
+            None
+        }
+    };
+
+    // If we found a matching pending task, we can mark it complete if it matches exactly.
+    if let Some(ref pending) = last_pending {
+        if *pending.request() == last_tdlib_call && response_key == *pending.response() {
+            if let Err(e) = pending.to_complete(pg_client).await {
+                error!("Failed to complete pending task: {e}");
             }
         }
-        None => {}
     }
+
+    // Now handle the actual logic, keyed by (RequestKeys, ResponseKeys).
+    match (last_tdlib_call, response_key) {
+        (RequestKeys::GetChats, ResponseKeys::Chats) => {
+            info!("Processing GetChats -> Chats");
+            let chats: Chats = serde_json::from_value(json_value).unwrap_or_else(|e| {
+                error!("Failed to parse Chats: {e}");
+                Chats::default()
+            });
+            for chat_id in chats.chat_ids() {
+                debug!("Found chat_id: {chat_id}");
+                // Grab info for each chat
+                if let Err(e) = td_chat_info(pg_client, *chat_id).await {
+                    error!("td_chat_info failed for chat_id {chat_id}: {e}");
+                }
+            }
+        }
+
+        (RequestKeys::GetChatHistory, ResponseKeys::Messages) => {
+            debug!("Processing GetChatHistory -> Messages");
+            if let Err(e) = chat_history(json_value, pg_client).await {
+                error!("chat_history failed: {e}");
+            }
+        }
+
+        (RequestKeys::GetChat, ResponseKeys::Chat) => {
+            debug!("Processing GetChat -> Chat");
+            if let Err(e) = get_chat(json_value, pg_client).await {
+                error!("get_chat failed: {e}");
+            }
+        }
+
+        (RequestKeys::SearchPublicChat, ResponseKeys::Chat) => {
+            debug!("Processing SearchPublicChat -> Chat");
+            // If you need to parse the `Chat` object, do it here
+            // let chat: Chat = serde_json::from_value(json_value)?;
+            // debug!("Found public chat with id {}", chat.id());
+        }
+
+        (RequestKeys::DownloadFile, ResponseKeys::UpdateFile) => {
+            debug!("Processing DownloadFile -> UpdateFile");
+            // Overwrite in case of multi-file support
+            let update_file: UpdateFile = match serde_json::from_value(json_value) {
+                Ok(uf) => uf,
+                Err(e) => {
+                    error!("Failed to parse UpdateFile: {e}");
+                    return Ok(());
+                }
+            };
+
+            let path = update_file.file().local().path();
+            debug!("Downloaded local path: {path}");
+
+            if !path.is_empty() {
+                let new_path = format!("profile_images/{}.png", update_file.file().id());
+                if let Err(e) = move_file(path, &new_path) {
+                    error!("Failed to move file {path} -> {new_path}: {e}");
+                }
+            }
+        }
+
+        (_, _) => {
+            // debug!(
+            //     "No handling for combination: RequestKeys::{:?} + ResponseKeys::{:?}",
+            //     last_tdlib_call, response_key
+            // );
+        }
+    }
+
     Ok(())
 }

@@ -7,7 +7,7 @@ use std::time::Duration;
 use tokio::time::{interval, sleep};
 
 pub async fn cron_manager(client_id: ClientId, pg_client: &PgClient) {
-    let mut interval = interval(Duration::from_secs(1));
+    let mut interval = interval(Duration::from_secs(3));
     interval.tick().await;
     let td_manager = TdManager::init(client_id);
     loop {

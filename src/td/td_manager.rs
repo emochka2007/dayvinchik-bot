@@ -1,4 +1,4 @@
-use crate::constants::update_last_tdlib_call;
+use crate::constants::update_last_request;
 use crate::pg::pg::{PgClient, PgConnect};
 use crate::td::td_json::send;
 use crate::td::td_request::RequestKeys;
@@ -17,14 +17,14 @@ pub struct TdManager {
 enum TaskStatus {
     WAITING,
     PENDING,
-    COMPLETED,
+    COMPLETE,
 }
 impl TaskStatus {
     pub fn to_str(&self) -> String {
         match self {
             TaskStatus::WAITING => String::from("WAITING"),
             TaskStatus::PENDING => String::from("PENDING"),
-            TaskStatus::COMPLETED => String::from("COMPLETED"),
+            TaskStatus::COMPLETE => String::from("COMPLETE"),
         }
     }
 }
@@ -113,9 +113,17 @@ impl Task {
         let row = pg_client.query_one(query, &[]).await?;
         Self::parse_row(row)
     }
-    pub async fn first_pending(pg_client: &PgClient) -> Result<Self, Error> {
-        let query = "SELECT * from tasks WHERE status='PENDING' ORDER BY created_at LIMIT 1";
-        let row = pg_client.query_one(query, &[]).await?;
+    pub async fn first_pending(
+        pg_client: &PgClient,
+        request_key: &RequestKeys,
+        response_key: &ResponseKeys,
+    ) -> Result<Self, Error> {
+        let query = "SELECT * from tasks WHERE status='PENDING' \
+        AND request=$1 AND response = $2 \
+        ORDER BY created_at LIMIT 1";
+        let row = pg_client
+            .query_one(query, &[&request_key.to_str(), &response_key.to_str()])
+            .await?;
         Self::parse_row(row)
     }
 
@@ -142,7 +150,8 @@ impl TdManager {
 
     pub async fn send_request(&self, pg_client: &PgClient) -> Result<(), Error> {
         let task = Task::first_waiting(pg_client).await?;
-        update_last_tdlib_call(task.request);
+        // error!("task -> {:?}", task);
+        update_last_request(task.request);
         task.to_pending(pg_client).await?;
         // tokio::time::sleep(Duration::from_secs(1)).await;
         send(self.client_id, &task.message);

@@ -22,7 +22,7 @@ impl ResponseKeys {
             ResponseKeys::UpdateFile => String::from("updateFile"),
             ResponseKeys::Chats => String::from("chats"),
             ResponseKeys::UpdateChatReadInbox => String::from("updateChatReadInbox"),
-            ResponseKeys::Ok => String::from("ok")
+            ResponseKeys::Ok => String::from("ok"),
         }
     }
     pub fn from_str(data: &str) -> io::Result<Self> {

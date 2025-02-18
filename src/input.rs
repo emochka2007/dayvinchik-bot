@@ -1,5 +1,5 @@
-use crate::chats::{td_get_last_message, td_chat_info, td_get_chats};
-use crate::constants::{update_last_tdlib_call, VINCHIK_CHAT};
+use crate::chats::{td_chat_info, td_get_chats, td_get_last_message};
+use crate::constants::{update_last_request, VINCHIK_CHAT};
 use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_reviewer::ProfileReviewer;
 use crate::file::{image_to_base64, move_file};

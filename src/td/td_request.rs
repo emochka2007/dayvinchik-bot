@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::io;
+use log::error;
 use tokio_postgres::types::{FromSql, Type};
 
 #[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
@@ -45,7 +46,8 @@ impl FromSql<'_> for RequestKeys {
             "getChatHistory" => Ok(RequestKeys::GetChatHistory),
             "downloadFile" => Ok(RequestKeys::DownloadFile),
             "getChat" => Ok(RequestKeys::GetChat),
-            "searchPubliChat" => Ok(RequestKeys::SearchPublicChat),
+            "searchPublicChat" => Ok(RequestKeys::SearchPublicChat),
+            "sendMessage" => Ok(RequestKeys::SendMessage),
             "getChats" => Ok(RequestKeys::GetChats),
             "openChat" => Ok(RequestKeys::OpenChat),
             _ => Ok(RequestKeys::Unknown),

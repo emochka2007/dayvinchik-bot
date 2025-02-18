@@ -4,12 +4,12 @@ use crate::file::{image_to_base64, move_file};
 use crate::openapi::llm_api::OpenAI;
 use crate::pg::pg::PgClient;
 use crate::prompts::Prompt;
+use crate::td::td_response::ResponseKeys;
 use log::{error, info};
 use serde_json::Error;
 use std::time::Duration;
 use tokio::time::sleep;
 use uuid::Uuid;
-use crate::td::td_response::ResponseKeys;
 
 /**
 - Entity in database
@@ -46,11 +46,10 @@ impl Actor {
         info!("Analyzing...");
         // First we update the chat and only after update latest messages for dv bot
         // todo if chats empty run or force flag mb
-        DvBot::on_init(pg_client).await?;
         DvBot::refresh(pg_client).await?;
+        DvBot::read_last_message(pg_client).await?;
         loop {
-            if let Ok(Some(_)) = ProfileReviewer::acquire_bot(pg_client).await {
-                DvBot::read_last_message(pg_client).await?;
+            if let Ok(Some(_)) = ProfileReviewer::get_ready_to_proceed(pg_client).await {
                 match ProfileReviewer::get_completed(pg_client).await {
                     Ok(profile_reviewer) => {
                         if let Some(score) = profile_reviewer.score() {
@@ -59,11 +58,19 @@ impl Actor {
                             } else {
                                 DvBot::send_dislike(pg_client).await?;
                             }
-                            ProfileReviewer::set_processed(profile_reviewer.id().to_string(), pg_client).await.unwrap();
-                            DvBot::refresh(pg_client).await?;
+                            ProfileReviewer::set_processed(
+                                profile_reviewer.id().to_string(),
+                                pg_client,
+                            )
+                                .await
+                                .unwrap();
+                            DvBot::read_last_message(pg_client).await?;
                         }
                     }
-                    Err(e) => error!("Error getting completed {:?}", e)
+                    Err(e) => {
+                        // error!("Error getting completed {:?}", e);
+                        DvBot::read_last_message(pg_client).await?;
+                    }
                 }
             }
 

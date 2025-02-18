@@ -22,7 +22,7 @@ pub async fn td_file_download(pg_client: &PgClient, file_id: i32) -> Result<(), 
         ResponseKeys::UpdateFile,
         pg_client,
     )
-        .await
-        .unwrap();
+    .await
+    .unwrap();
     Ok(())
 }

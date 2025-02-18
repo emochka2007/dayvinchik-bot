@@ -32,6 +32,7 @@ use std::env;
 use std::time::Duration;
 use tokio::runtime::Handle;
 use tokio::time::sleep;
+use crate::entities::dv_bot::DvBot;
 
 #[tokio::main]
 async fn main() {
@@ -59,7 +60,7 @@ async fn main() {
 
             if let Some(x) = msg {
                 // info!("X -> {x}");
-                parse_message(&x, client_id, &client)
+                parse_message(&x, &client)
                     .await
                     .unwrap_or_else(|e| error!("{:?}", e));
             }
@@ -79,6 +80,10 @@ async fn main() {
 
     if let Ok(client) = pool.get().await {
         tokio::spawn(async move {
+            let UPDATE_CHAT = env::var("UPDATE_CHAT").unwrap();
+            if UPDATE_CHAT == "TRUE" {
+                DvBot::on_init(&client).await.unwrap();
+            }
             Actor::new(ActorType::DEFAULT, 50)
                 .analyze(&client)
                 .await

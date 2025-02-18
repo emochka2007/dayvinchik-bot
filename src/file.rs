@@ -1,12 +1,12 @@
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
+use log::error;
 use std::ffi::OsString;
 use std::fs::{read_dir, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::{env, fs, io};
 use std::time::Duration;
-use log::error;
+use std::{env, fs, io};
 use tokio::time::sleep;
 
 pub fn get_project_root() -> io::Result<PathBuf> {
@@ -68,17 +68,17 @@ pub async fn get_image_with_retries(path_to_img: &str) -> io::Result<String> {
                 }
                 Err(e) => {
                     attempts += 1;
-                    error!(
-                                "Failed to load image to base64 (attempt {}/{}): {}",
-                                attempts, max_attempts, e
-                            );
+                    // error!(
+                    //     "Failed to load image to base64 (attempt {}/{}): {}",
+                    //     attempts, max_attempts, e
+                    // );
 
                     if attempts >= max_attempts {
-                        error!(
-                                    "Max attempts reached. Image file still not found at '{}'. \
-                                     Marked as failed and returning.",
-                                    path_to_img
-                                );
+                        // error!(
+                        //     "Max attempts reached. Image file still not found at '{}'. \
+                        //              Marked as failed and returning.",
+                        //     path_to_img
+                        // );
                         return Err(io::Error::new(
                             io::ErrorKind::TimedOut,
                             "Ran out of places to find Cargo.toml",

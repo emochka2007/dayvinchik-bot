@@ -93,8 +93,8 @@ pub async fn td_get_chats(pg_client: &PgClient) {
         ResponseKeys::Chats,
         pg_client,
     )
-        .await
-        .unwrap();
+    .await
+    .unwrap();
 }
 
 pub async fn td_get_last_message(
@@ -114,12 +114,12 @@ pub async fn td_get_last_message(
         ResponseKeys::Messages,
         pg_client,
     )
-        .await
-        .unwrap();
+    .await
+    .unwrap();
     Ok(())
 }
 
-pub async fn td_chat_info(pg_client: &PgClient, chat_id: ChatId) {
+pub async fn td_chat_info(pg_client: &PgClient, chat_id: ChatId) -> Result<(), Error> {
     let message = TdGetChat::builder().chat_id(chat_id).build();
     let chat_history_msg = serde_json::to_string(&message).unwrap();
     Task::new(
@@ -128,8 +128,8 @@ pub async fn td_chat_info(pg_client: &PgClient, chat_id: ChatId) {
         ResponseKeys::Chat,
         pg_client,
     )
-        .await
-        .unwrap();
+    .await?;
+    Ok(())
 }
 
 pub async fn get_chat(
@@ -168,6 +168,6 @@ pub async fn td_open_chat(pg_client: &PgClient, chat_id: ChatId) -> Result<(), E
         ResponseKeys::Ok,
         pg_client,
     )
-        .await?;
+    .await?;
     Ok(())
 }

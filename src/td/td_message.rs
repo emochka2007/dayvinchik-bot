@@ -162,10 +162,11 @@ pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<(), s
             };
             profile_match.insert_db(pg_client).await.unwrap();
         }
-        debug!("Parsed message {:?}", parsed_message);
+        error!("Parsed message {:?}", parsed_message);
         //todo if profile_reviwer active
         let file_ids = parsed_message.file_ids();
-        if !parsed_message.text().is_empty() & &file_ids.is_some() {
+        // Upd: removed check for text, however it's good to verify, for some reason couldn't parse the text
+        if file_ids.is_some() {
             if file_ids.clone().unwrap().iter().len() > 0 {
                 let mut profile_reviewer = ProfileReviewer::new(
                     message.chat_id(),

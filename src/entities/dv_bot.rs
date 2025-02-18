@@ -1,5 +1,6 @@
 /* Day vinchik bot implementation */
-use crate::chats::{td_get_last_message, td_chat_info, td_get_chats, td_open_chat, ChatMeta};
+use crate::chats::{td_chat_info, td_get_chats, td_get_last_message, td_open_chat, ChatMeta};
+use crate::common::ChatId;
 use crate::constants::{VINCHIK_CHAT, VINCHIK_CHAT_INT};
 use crate::messages::message::SendMessage;
 use crate::pg::pg::PgClient;
@@ -8,7 +9,6 @@ use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
 use log::error;
 use serde_json::Error;
-use crate::common::ChatId;
 
 pub struct DvBot {}
 
@@ -89,9 +89,9 @@ impl DvBot {
         let limit = 1;
         if let Ok(chat) = ChatMeta::select_by_chat_id(VINCHIK_CHAT_INT, pg_client).await {
             td_get_last_message(pg_client, *chat.chat_id(), limit).await?;
-            Self::update_bot_last_message(pg_client, *chat.chat_id()).await?;
+            Self::update_bot_last_message(pg_client, *chat.chat_id()).await.unwrap();
         } else {
-            error!("Chat not found");
+            // error!("Chat not found");
         }
 
         Ok(())
@@ -101,8 +101,11 @@ impl DvBot {
         td_open_chat(pg_client, VINCHIK_CHAT_INT).await.unwrap();
         Ok(())
     }
-    pub async fn update_bot_last_message(pg_client: &PgClient, chat_id: ChatId) -> Result<(), Error> {
-        td_chat_info(pg_client, chat_id).await;
+    pub async fn update_bot_last_message(
+        pg_client: &PgClient,
+        chat_id: ChatId,
+    ) -> Result<(), tokio_postgres::Error> {
+        td_chat_info(pg_client, chat_id).await?;
         Ok(())
     }
 }

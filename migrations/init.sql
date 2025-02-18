@@ -63,7 +63,7 @@ Create table if not exists profile_reviewers
     chat_id    bigint,
     text       text,
     file_ids   int[],
-    -- PENDING, WAITING, COMPLETED
+    -- PENDING, WAITING, COMPLETE
     status     text                                 default 'WAITING',
     score      int                         null,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
@@ -79,7 +79,7 @@ Create table if not exists tasks
 (
     id         uuid primary key                     default uuid_generate_v4(),
     message    text,
-    -- WAITING, COMPLETED
+    -- WAITING, COMPLETE
     status     text                                 DEFAULT 'WAITING',
     request    text,
     response   text,
@@ -96,7 +96,7 @@ Create table if not exists superlikes
 (
     id                  uuid primary key                     default uuid_generate_v4(),
     message             text,
-    -- WAITING, COMPLETED
+    -- WAITING, COMPLETE
     profile_reviewer_id uuid references profile_reviewers,
     status              text                                 DEFAULT 'WAITING',
     created_at          TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,

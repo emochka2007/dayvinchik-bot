@@ -1,21 +1,21 @@
+use crate::entities::dv_bot::DvBot;
 use crate::file::{get_image_with_retries, image_to_base64, move_file};
 use crate::openapi::llm_api::OpenAI;
 use crate::pg::pg::PgClient;
 use crate::prompts::Prompt;
+use crate::td::td_json::ClientId;
 use log::{debug, error};
 use std::time::Duration;
 use tokio::time::sleep;
 use tokio_postgres::types::IsNull::No;
 use tokio_postgres::{Client, Error, Row};
 use uuid::Uuid;
-use crate::entities::dv_bot::DvBot;
-use crate::td::td_json::ClientId;
 
 #[derive(Debug)]
 pub enum ProfileReviewerStatus {
     WAITING,
     PENDING,
-    COMPLETED,
+    COMPLETE,
     FAILED,
     //todo processed status
 }
@@ -66,18 +66,17 @@ impl ProfileReviewer {
         match client.query_one(query, &[]).await {
             Ok(row) => Self::from_sql(row),
             Err(e) => {
-                error!("Failed to execute query: {}", e);
+                // error!("Failed to execute get_waiting query: {}", e);
                 Err(e)
             }
         }
     }
     pub async fn get_completed(client: &PgClient) -> Result<ProfileReviewer, Error> {
-        let query = "SELECT id::text, chat_id, text, file_ids,score FROM profile_reviewers WHERE status='COMPLETED' LIMIT 1";
-        error!("query get_completed execute");
+        let query = "SELECT id::text, chat_id, text, file_ids,score FROM profile_reviewers WHERE status='COMPLETE' LIMIT 1";
         match client.query_one(query, &[]).await {
             Ok(row) => Self::from_sql(row),
             Err(e) => {
-                error!("Failed to execute query: {}", e);
+                // error!("Failed to execute get_completed query: {}", e);
                 Err(e)
             }
         }
@@ -105,13 +104,13 @@ impl ProfileReviewer {
                 match Self::set_pending(id, client).await {
                     Ok(_) => Self::from_sql(row),
                     Err(e) => {
-                        error!("Failed to execute set_pending query: {}", e);
+                        // error!("Failed to execute set_pending query: {}", e);
                         Err(e)
                     }
                 }
             }
             Err(e) => {
-                error!("Failed to execute start query: {}", e);
+                // error!("Failed to execute start query: {}", e);
                 Err(e)
             }
         }
@@ -130,25 +129,44 @@ impl ProfileReviewer {
     }
 
     pub async fn acquire(client: &PgClient) -> Result<Option<()>, Error> {
-        let query = "SELECT id from profile_reviewers WHERE status = 'PENDING' OR status='COMPLETED'";
+        let query =
+            "SELECT id from profile_reviewers WHERE status = 'PENDING' OR status='COMPLETE'";
         let rows_len = client.query(query, &[]).await?.len();
         // If no running reviewers then we can run new profile_reviewer
-        if rows_len == 0 {
-            match Self::get_waiting(client).await {
-                Ok(_) => Ok(Some(())),
-                Err(_e) => Ok(None),
-            }?;
-            return Ok(Some(()));
+        match client.query(query, &[]).await {
+            Ok(rows) => {
+                if rows.len() == 0 {
+                    match Self::get_waiting(client).await {
+                        Ok(_) => Ok(Some(())),
+                        Err(_e) => Ok(None),
+                    }?;
+                    return Ok(Some(()));
+                } else {
+                    Ok(None)
+                }
+            }
+            Err(e) => {
+                //todo match for row count error only here
+                Ok(Some(()))
+            }
         }
-        Ok(None)
     }
-    pub async fn acquire_bot(client: &PgClient) -> Result<Option<()>, Error> {
+
+    pub async fn get_ready_to_proceed(client: &PgClient) -> Result<Option<()>, Error> {
         let query = "SELECT id from profile_reviewers WHERE status = 'PENDING' OR status='WAITING'";
-        let rows_len = client.query(query, &[]).await?.len();
-        if rows_len == 0 {
-            return Ok(Some(()));
+        match client.query(query, &[]).await {
+            Ok(rows) => {
+                if rows.len() == 0 {
+                    Ok(Some(()))
+                } else {
+                    Ok(None)
+                }
+            }
+            Err(e) => {
+                //todo match for row count error only here
+                Ok(Some(()))
+            }
         }
-        Ok(None)
     }
 
     pub async fn insert_db(&self, client: &PgClient) -> Result<(), Error> {
@@ -160,14 +178,14 @@ impl ProfileReviewer {
                 .query(query, &[&self.chat_id, &self.text, &"WAITING", &file_ids])
                 .await?;
         } else {
-            error!("Profile reviewer is still pending. Cannot insert new one");
+            debug!("Profile reviewer is still pending. Cannot insert new one");
         }
         Ok(())
     }
 
     pub async fn finalize(&self, client: &PgClient, score: i32) -> Result<(), Error> {
         let query = "UPDATE profile_reviewers SET \
-        status='COMPLETED', \
+        status='COMPLETE', \
         score=$1 \
         WHERE id=$2";
         let id = &Uuid::parse_str(&self.id).unwrap();
@@ -203,10 +221,6 @@ impl ProfileReviewer {
                             let reviewed_file =
                                 format!("reviewed_images/{}.png", last_pending.id());
                             move_file(&path_to_img, &reviewed_file).expect("TODO: panic message");
-                            //todo config threshold
-                            // if score < 90 {
-                            //     DvBot::send_dislike(pg_client).await.unwrap();
-                            // } else {}
                         }
                         Err(e) => {
                             last_pending.to_failed(&pg_client).await?;
