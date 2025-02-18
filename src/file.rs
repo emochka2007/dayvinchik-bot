@@ -5,6 +5,9 @@ use std::fs::{read_dir, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::{env, fs, io};
+use std::time::Duration;
+use log::error;
+use tokio::time::sleep;
 
 pub fn get_project_root() -> io::Result<PathBuf> {
     let path = env::current_dir()?;
@@ -51,6 +54,43 @@ pub fn move_file(src: &str, dest: &str) -> io::Result<()> {
         // error!("Failed to move file: {}", err);
     });
     Ok(())
+}
+pub async fn get_image_with_retries(path_to_img: &str) -> io::Result<String> {
+    let base64_image = {
+        //todo config
+        let max_attempts = 3;
+        let mut attempts = 0;
+
+        loop {
+            match image_to_base64(&path_to_img) {
+                Ok(img) => {
+                    break img;
+                }
+                Err(e) => {
+                    attempts += 1;
+                    error!(
+                                "Failed to load image to base64 (attempt {}/{}): {}",
+                                attempts, max_attempts, e
+                            );
+
+                    if attempts >= max_attempts {
+                        error!(
+                                    "Max attempts reached. Image file still not found at '{}'. \
+                                     Marked as failed and returning.",
+                                    path_to_img
+                                );
+                        return Err(io::Error::new(
+                            io::ErrorKind::TimedOut,
+                            "Ran out of places to find Cargo.toml",
+                        ));
+                    } else {
+                        sleep(Duration::from_secs(1)).await;
+                    }
+                }
+            }
+        }
+    };
+    Ok(base64_image)
 }
 pub fn image_to_base64(path: &str) -> io::Result<String> {
     let mut file = File::open(path)?;

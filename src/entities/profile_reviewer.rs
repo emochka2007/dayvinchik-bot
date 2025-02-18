@@ -1,4 +1,4 @@
-use crate::file::{image_to_base64, move_file};
+use crate::file::{get_image_with_retries, image_to_base64, move_file};
 use crate::openapi::llm_api::OpenAI;
 use crate::pg::pg::PgClient;
 use crate::prompts::Prompt;
@@ -152,16 +152,14 @@ impl ProfileReviewer {
         score=$1 \
         WHERE id=$2";
         let id = &Uuid::parse_str(&self.id).unwrap();
-        //todo make it clean
         client.query(query, &[&score, id]).await?;
         Ok(())
     }
-    pub async fn cancel(&self, pg_client: &PgClient) -> Result<(), Error> {
+    pub async fn to_failed(&self, pg_client: &PgClient) -> Result<(), Error> {
         let query = "UPDATE profile_reviewers SET \
-        status='FAILED', \
-        WHERE id=$2";
+        status='FAILED' \
+        WHERE id=$1";
         let id = &Uuid::parse_str(&self.id).unwrap();
-        //todo make it clean
         pg_client.query(query, &[id]).await?;
         Ok(())
     }
@@ -172,7 +170,7 @@ impl ProfileReviewer {
                 let open_ai = OpenAI::new();
                 let prompt = Prompt::analyze_alt();
                 let path_to_img = format!("profile_images/{}.png", last_pending.main_file());
-                if let Ok(base64_image) = image_to_base64(&path_to_img) {
+                if let Ok(base64_image) = get_image_with_retries(&path_to_img).await {
                     let response = open_ai
                         .send_sys_image_message(prompt.system.unwrap(), prompt.user, base64_image)
                         .await
@@ -188,10 +186,12 @@ impl ProfileReviewer {
                             move_file(&path_to_img, &reviewed_file).expect("TODO: panic message");
                         }
                         Err(e) => {
+                            last_pending.to_failed(&pg_client).await?;
                             error!("Response parsing error {:?}", e)
                         }
                     }
                 } else {
+                    last_pending.to_failed(&pg_client).await?;
                     error!(
                         "Couldn't find the image_to_base64 file, expected {}",
                         path_to_img
