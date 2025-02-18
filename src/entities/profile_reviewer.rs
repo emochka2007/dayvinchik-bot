@@ -8,6 +8,7 @@ use tokio::time::sleep;
 use tokio_postgres::types::IsNull::No;
 use tokio_postgres::{Client, Error, Row};
 use uuid::Uuid;
+use crate::entities::dv_bot::DvBot;
 use crate::td::td_json::ClientId;
 
 #[derive(Debug)]
@@ -16,6 +17,7 @@ pub enum ProfileReviewerStatus {
     PENDING,
     COMPLETED,
     FAILED,
+    //todo processed status
 }
 
 //todo implement multi-image storing
@@ -23,7 +25,7 @@ pub enum ProfileReviewerStatus {
 pub struct ProfileReviewer {
     id: String,
     chat_id: i64,
-    score: Option<i16>,
+    score: Option<i32>,
     text: String,
     status: ProfileReviewerStatus,
     file_ids: Option<Vec<i32>>,
@@ -41,7 +43,7 @@ impl ProfileReviewer {
             file_ids: None,
         }
     }
-    pub fn _score(&self) -> &Option<i16> {
+    pub fn score(&self) -> &Option<i32> {
         &self.score
     }
     pub fn _status(&self) -> &ProfileReviewerStatus {
@@ -69,6 +71,17 @@ impl ProfileReviewer {
             }
         }
     }
+    pub async fn get_completed(client: &PgClient) -> Result<ProfileReviewer, Error> {
+        let query = "SELECT id::text, chat_id, text, file_ids,score FROM profile_reviewers WHERE status='COMPLETED' LIMIT 1";
+        error!("query get_completed execute");
+        match client.query_one(query, &[]).await {
+            Ok(row) => Self::from_sql(row),
+            Err(e) => {
+                error!("Failed to execute query: {}", e);
+                Err(e)
+            }
+        }
+    }
 
     // pub async fn get_by_file_id(pg_client: &PgClient) -> Result<ProfileReviewer, Error> {}
 
@@ -76,7 +89,7 @@ impl ProfileReviewer {
     fn from_sql(row: Row) -> Result<ProfileReviewer, Error> {
         Ok(Self {
             chat_id: row.try_get("chat_id")?,
-            score: row.try_get("score").unwrap_or_default(),
+            score: Some(row.try_get("score").unwrap_or_default()),
             id: row.try_get("id")?,
             text: row.try_get("text")?,
             status: ProfileReviewerStatus::PENDING,
@@ -109,9 +122,15 @@ impl ProfileReviewer {
         client.query(query, &[id]).await?;
         Ok(())
     }
+    pub async fn set_processed(id: String, client: &PgClient) -> Result<(), Error> {
+        let query = "UPDATE profile_reviewers SET status='PROCESSED' WHERE id=$1";
+        let id = &Uuid::parse_str(&id).unwrap();
+        client.query(query, &[id]).await?;
+        Ok(())
+    }
 
     pub async fn acquire(client: &PgClient) -> Result<Option<()>, Error> {
-        let query = "SELECT id from profile_reviewers WHERE status = 'PENDING'";
+        let query = "SELECT id from profile_reviewers WHERE status = 'PENDING' OR status='COMPLETED'";
         let rows_len = client.query(query, &[]).await?.len();
         // If no running reviewers then we can run new profile_reviewer
         if rows_len == 0 {
@@ -184,6 +203,10 @@ impl ProfileReviewer {
                             let reviewed_file =
                                 format!("reviewed_images/{}.png", last_pending.id());
                             move_file(&path_to_img, &reviewed_file).expect("TODO: panic message");
+                            //todo config threshold
+                            // if score < 90 {
+                            //     DvBot::send_dislike(pg_client).await.unwrap();
+                            // } else {}
                         }
                         Err(e) => {
                             last_pending.to_failed(&pg_client).await?;

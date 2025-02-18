@@ -33,7 +33,7 @@ pub async fn parse_message(
                     debug!("Key {:?}", key);
                     let last_tdlib_call = get_last_tdlib_call();
                     debug!("Last tdlib call {:?}", last_tdlib_call);
-                    //todo i'm sure i can improve it
+                    todo search by status and response and then only finish it
                     let last_pending = Task::first_pending(pg_client).await.unwrap_or_default();
                     if *last_pending.request() == last_tdlib_call && key == *last_pending.response()
                     {

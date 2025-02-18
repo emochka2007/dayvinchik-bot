@@ -79,7 +79,7 @@ async fn main() {
 
     if let Ok(client) = pool.get().await {
         tokio::spawn(async move {
-            Actor::new(ActorType::DEFAULT)
+            Actor::new(ActorType::DEFAULT, 50)
                 .analyze(&client)
                 .await
                 .expect("TODO: panic message");

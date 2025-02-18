@@ -23,13 +23,15 @@ pub enum ActorType {
 pub struct Actor {
     id: Uuid,
     actor_type: ActorType,
+    score_threshold: i32,
 }
 
 impl Actor {
-    pub fn new(actor_type: ActorType) -> Self {
+    pub fn new(actor_type: ActorType, score_threshold: i32) -> Self {
         Self {
             id: Uuid::new_v4(),
             actor_type,
+            score_threshold,
         }
     }
 
@@ -43,15 +45,29 @@ impl Actor {
     pub async fn analyze(&self, pg_client: &PgClient) -> Result<(), Error> {
         info!("Analyzing...");
         // First we update the chat and only after update latest messages for dv bot
-        DvBot::refresh(pg_client).await?;
         // todo if chats empty run or force flag mb
-        // DvBot::on_init(pg_client).await?;
+        DvBot::on_init(pg_client).await?;
+        DvBot::refresh(pg_client).await?;
         loop {
             if let Ok(Some(_)) = ProfileReviewer::acquire_bot(pg_client).await {
                 DvBot::read_last_message(pg_client).await?;
-                DvBot::send_dislike(pg_client).await?;
+                match ProfileReviewer::get_completed(pg_client).await {
+                    Ok(profile_reviewer) => {
+                        if let Some(score) = profile_reviewer.score() {
+                            if *score >= self.score_threshold {
+                                DvBot::send_like(pg_client).await?;
+                            } else {
+                                DvBot::send_dislike(pg_client).await?;
+                            }
+                            ProfileReviewer::set_processed(profile_reviewer.id().to_string(), pg_client).await.unwrap();
+                            DvBot::refresh(pg_client).await?;
+                        }
+                    }
+                    Err(e) => error!("Error getting completed {:?}", e)
+                }
             }
-            sleep(Duration::from_secs(5)).await;
+
+            sleep(Duration::from_secs(10)).await;
         }
         // Ok(())
     }

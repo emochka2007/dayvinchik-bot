@@ -85,7 +85,8 @@ impl DvBot {
 
     /// Vinchik should be inside db already.
     pub async fn read_last_message(pg_client: &PgClient) -> Result<(), Error> {
-        let limit = 2;
+        //todo bug fix required
+        let limit = 1;
         if let Ok(chat) = ChatMeta::select_by_chat_id(VINCHIK_CHAT_INT, pg_client).await {
             td_get_last_message(pg_client, *chat.chat_id(), limit).await?;
             Self::update_bot_last_message(pg_client, *chat.chat_id()).await?;
