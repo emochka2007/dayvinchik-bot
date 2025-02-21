@@ -1,5 +1,4 @@
 mod auth;
-mod chats;
 mod common;
 mod constants;
 mod cron;
@@ -23,7 +22,7 @@ use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_reviewer::ProfileReviewer;
 use crate::helpers::input;
 use crate::input::match_input;
-use crate::pg::pg::{PgClient, PgConnect};
+use crate::pg::pg::PgConnect;
 use crate::td::init_tdlib_params;
 use crate::td::read::parse_message;
 use crate::td::td_json::{new_client, receive};

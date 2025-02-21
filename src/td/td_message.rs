@@ -1,10 +1,15 @@
 use crate::common::{BotError, ChatId, FileId, MessageId};
 use crate::entities::profile_match::ProfileMatch;
 use crate::entities::profile_reviewer::{ProfileReviewer, ProfileReviewerStatus};
-use crate::pg::pg::PgClient;
+use crate::pg::pg::{DbQuery, PgClient};
 use crate::td::td_file::td_file_download;
+use crate::td::td_manager::Task;
+use crate::td::td_request::RequestKeys;
+use crate::td::td_response::ResponseKeys;
 use log::{debug, error};
-use rust_tdlib::types::{Message, MessageContent, Messages, TextEntity, TextEntityType};
+use rust_tdlib::types::{
+    GetChatHistory, Message, MessageContent, Messages, TextEntity, TextEntityType,
+};
 use serde_json::Value;
 use tokio_postgres::Error;
 use uuid::Uuid;
@@ -151,39 +156,62 @@ fn get_url_entity(entities: &Vec<TextEntity>, content: &mut ParseMessageContent)
 
 pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<(), BotError> {
     let messages: Messages = serde_json::from_value(json_str)?;
-
     error!("messages {:?}", messages);
     for message in messages.messages() {
-        let message = message.as_ref().unwrap();
-        let parsed_message = MessageMeta::from_message(message, None)?;
-        parsed_message.insert_db(pg_client).await?;
-        if parsed_message.is_match() {
-            let profile_match = ProfileMatch {
-                url: parsed_message.url().as_ref().unwrap().to_string(),
-                full_text: parsed_message.text().to_string(),
-            };
-            profile_match.insert_db(pg_client).await.unwrap();
-        }
-        error!("Parsed message {:?}", parsed_message);
-        //todo if profile_reviwer active
-        let file_ids = parsed_message.file_ids();
-        // Upd: removed check for text, however it's good to verify, for some reason couldn't parse the text
-        if file_ids.is_some() {
-            if file_ids.clone().unwrap().iter().len() > 0 {
-                let mut profile_reviewer = ProfileReviewer::new(
-                    message.chat_id(),
-                    parsed_message.text(),
-                    ProfileReviewerStatus::PENDING,
-                );
-                profile_reviewer
-                    .set_file_ids(Some(parsed_message.file_ids().as_ref().unwrap().clone()));
-                profile_reviewer
-                    .insert_db(pg_client)
-                    .await
-                    .expect("TODO: panic message");
-                td_file_download(pg_client, profile_reviewer.main_file()).await?;
+        match message.as_ref() {
+            Some(message) => {
+                let parsed_message = MessageMeta::from_message(message, None)?;
+                parsed_message.insert_db(pg_client).await?;
+                if parsed_message.is_match() {
+                    if let Some(url) = &parsed_message.url {
+                        let profile_match = ProfileMatch {
+                            url: url.to_string(),
+                            full_text: parsed_message.text().to_string(),
+                        };
+                        profile_match.insert_db(pg_client).await?;
+                    }
+                }
+                error!("Parsed message {:?}", parsed_message);
+                match parsed_message.file_ids() {
+                    Some(file_ids) => {
+                        // Upd: removed check for text, however it's good to verify, for some reason couldn't parse the text
+                        if file_ids.len() > 0 {
+                            let mut profile_reviewer = ProfileReviewer::new(
+                                message.chat_id(),
+                                parsed_message.text(),
+                                ProfileReviewerStatus::PENDING,
+                            );
+                            profile_reviewer.set_file_ids(file_ids.clone());
+                            profile_reviewer.insert(pg_client).await?;
+                            td_file_download(pg_client, profile_reviewer.main_file()).await?;
+                        }
+                    }
+                    None => {}
+                }
             }
+            None => {}
         }
     }
+    Ok(())
+}
+
+pub async fn td_get_last_message(
+    pg_client: &PgClient,
+    chat_id: ChatId,
+    limit: i32,
+) -> Result<(), BotError> {
+    let history_message = GetChatHistory::builder()
+        .chat_id(chat_id)
+        .from_message_id(0)
+        .limit(limit)
+        .build();
+    let message = serde_json::to_string(&history_message)?;
+    Task::new(
+        message,
+        RequestKeys::GetChatHistory,
+        ResponseKeys::Messages,
+        pg_client,
+    )
+        .await?;
     Ok(())
 }

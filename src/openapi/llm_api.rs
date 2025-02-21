@@ -1,32 +1,31 @@
+use crate::common::BotError;
 use crate::file::image_to_base64;
-use crate::openapi::openai::ChatCompletionResponse;
+use crate::openapi::openai::{ChatCompletionResponse, Choice};
 use crate::prompts::Prompt;
-use log::debug;
+use log::{debug, info};
 use reqwest::Client;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
-use std::env;
-use std::error::Error;
+use std::io::ErrorKind;
+use std::{env, io};
 
-type OpenAIError = Box<dyn Error>;
 pub struct OpenAI {
     key: String,
     client: Client,
     base_url: String,
 }
 impl OpenAI {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, BotError> {
         let client = Client::new();
         let base_url = "https://api.openai.com/v1/chat/".to_string();
-        Self {
-            key: env::var("OPEN_API_KEY").unwrap(),
+        Ok(Self {
+            key: env::var("OPEN_API_KEY")?,
             client,
             base_url,
-        }
+        })
     }
 
-    //Post Request
-    async fn post<T: DeserializeOwned>(&self, body: Value) -> Result<T, OpenAIError> {
+    async fn post<T: DeserializeOwned>(&self, body: Value) -> Result<T, BotError> {
         let response = self
             .client
             .post(format!("{}completions", self.base_url))
@@ -38,7 +37,14 @@ impl OpenAI {
         Ok(response.json::<T>().await?)
     }
 
-    pub async fn _send_user_message(&self, message: String) -> Result<String, OpenAIError> {
+    fn parse_choice(chat_completion_response: &ChatCompletionResponse) -> Result<String, BotError> {
+        match chat_completion_response.choices.get(0) {
+            Some(choice) => Ok(choice.message.content.to_string()),
+            None => Err(io::Error::new(ErrorKind::InvalidData, "Choice not found").into()),
+        }
+    }
+
+    pub async fn _send_user_message(&self, message: String) -> Result<String, BotError> {
         let prompt = Prompt::main(&message);
         let content = prompt.user;
         let body = json!({
@@ -49,15 +55,14 @@ impl OpenAI {
         ]
         });
         let response = self.post::<ChatCompletionResponse>(body).await?;
-        let text = response.choices.get(0).unwrap().message.content.to_string();
-        Ok(text)
+        Self::parse_choice(&response)
     }
 
     pub async fn _send_sys_message(
         &self,
         sys_message: String,
         user_message: String,
-    ) -> Result<String, OpenAIError> {
+    ) -> Result<String, BotError> {
         let body = json!({
         "model": "gpt-4o",
         "store": true,
@@ -67,20 +72,19 @@ impl OpenAI {
         ]
         });
         let response = self.post::<ChatCompletionResponse>(body).await?;
-        let text = response.choices.get(0).unwrap().message.content.to_string();
-        Ok(text)
+        Self::parse_choice(&response)
     }
     pub async fn send_sys_image_message(
         &self,
         sys_message: String,
         user_message: String,
         image: String,
-    ) -> Result<String, OpenAIError> {
+    ) -> Result<String, BotError> {
         //todo create a func to convert
         let base64img = format!("data:image/png;base64,{}", image);
         let popusk_base64 = format!(
             "data:image/jpg;base64,{}",
-            image_to_base64("alt_images/popusk.jpg").unwrap()
+            image_to_base64("alt_images/popusk.jpg")?
         );
         let body = json!({
             "model": "gpt-4o",
@@ -114,8 +118,7 @@ impl OpenAI {
             ]
         });
         let response = self.post::<ChatCompletionResponse>(body).await?;
-        debug!("{:?}", response);
-        let text = response.choices.get(0).unwrap().message.content.to_string();
-        Ok(text)
+        info!("OpenAI response {:?}", response);
+        Self::parse_choice(&response)
     }
 }

@@ -1,6 +1,6 @@
-use crate::chats::{get_chat, td_chat_info};
 use crate::common::BotError;
 use crate::constants::get_last_request;
+use crate::entities::chat_meta::{get_chat, td_chat_info};
 use crate::file::move_file;
 use crate::pg::pg::PgClient;
 use crate::td::td_manager::Task;

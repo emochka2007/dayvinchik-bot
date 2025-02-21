@@ -56,12 +56,19 @@ pub enum BotError {
         #[backtrace]
         backtrace: Backtrace,
     },
-    #[error("Mutex poisoned: {source}")]
-    MutexPoison {
-        source: String,
+    #[error("Reqwest error: {source}")]
+    ReqwestError {
+        #[from]
+        source: reqwest::Error,
         #[backtrace]
         backtrace: Backtrace,
     },
+    // #[error("Mutex poisoned: {source}")]
+    // MutexPoison {
+    //     source: String,
+    //     #[backtrace]
+    //     backtrace: Backtrace,
+    // },
 }
 
 pub fn env_init() {

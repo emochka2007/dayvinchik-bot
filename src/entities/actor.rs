@@ -1,13 +1,9 @@
 use crate::common::BotError;
 use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_reviewer::ProfileReviewer;
-use crate::file::{image_to_base64, move_file};
-use crate::openapi::llm_api::OpenAI;
 use crate::pg::pg::PgClient;
 use crate::prompts::Prompt;
-use crate::td::td_response::ResponseKeys;
-use log::{error, info};
-use serde_json::Error;
+use log::{info};
 use std::time::Duration;
 use tokio::time::sleep;
 use uuid::Uuid;
@@ -49,7 +45,8 @@ impl Actor {
         DvBot::refresh(pg_client).await?;
         DvBot::read_last_message(pg_client).await?;
         loop {
-            if let Ok(Some(_)) = ProfileReviewer::get_ready_to_proceed(pg_client).await {
+            let _ = ProfileReviewer::get_ready_to_proceed(pg_client).await.is_ok();
+            {
                 match ProfileReviewer::get_completed(pg_client).await {
                     Ok(profile_reviewer) => {
                         if let Some(score) = profile_reviewer.score() {
@@ -62,7 +59,7 @@ impl Actor {
                                 profile_reviewer.id().to_string(),
                                 pg_client,
                             )
-                            .await?;
+                                .await?;
                             DvBot::read_last_message(pg_client).await?;
                         }
                     }

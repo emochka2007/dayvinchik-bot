@@ -1,10 +1,9 @@
 use crate::common::BotError;
+use async_trait::async_trait;
 use deadpool_postgres::{Config, Manager, ManagerConfig, Pool, RecyclingMethod, Runtime};
 use log::info;
 use std::env;
-use async_trait::async_trait;
-use dotenvy::Error;
-use tokio_postgres::{Client, NoTls};
+use tokio_postgres::{Client, NoTls, Row};
 use uuid::Uuid;
 
 const WORKERS: usize = 16;
@@ -116,14 +115,26 @@ impl PgConnect {
 
 #[async_trait]
 pub trait DbQuery {
-    async fn insert(&self, pg_client: &PgClient) -> Result<(), BotError>;
-    async fn select_one(pg_client: PgClient, id: Uuid) -> Result<Self, BotError>
+    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<(), BotError>;
+    async fn select_one(pg_client: &PgClient, id: Uuid) -> Result<Self, BotError>
+    where
+        Self: Sized;
+    fn from_sql(row: Row) -> Result<Self, BotError>
     where
         Self: Sized;
 }
 #[async_trait]
 pub trait DbStatusQuery {
     type Status;
-    async fn update_status(&self, pg_client: &PgClient, status: Self::Status) -> Result<(), BotError>;
-    async fn get_by_status_one(&self, pg_client: &PgClient, status: Self::Status) -> Result<(), BotError>;
+    async fn update_status<'a>(
+        &'a self,
+        pg_client: &'a PgClient,
+        status: Self::Status,
+    ) -> Result<(), BotError>;
+    async fn get_by_status_one(
+        pg_client: &PgClient,
+        status: Self::Status,
+    ) -> Result<Self, BotError>
+    where
+        Self: Sized;
 }

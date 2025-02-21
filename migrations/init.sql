@@ -11,11 +11,11 @@ CREATE extension if not exists "uuid-ossp";
 CREATE table if not exists chats
 (
     id                   uuid primary key                     default uuid_generate_v4(),
-    chat_id              bigint unique,
+    chat_id              bigint unique               not null,
     -- mb unique --
-    last_read_message_id bigint,
-    last_message_id      bigint,
-    title                text,
+    last_read_message_id bigint                      not null,
+    last_message_id      bigint                      not null,
+    title                text                        not null,
     created_at           TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
     updated_at           TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp
 );
@@ -28,10 +28,10 @@ EXECUTE FUNCTION update_timestamp();
 Create table if not exists messages
 (
     id         uuid primary key                     default uuid_generate_v4(),
-    chat_id    bigint,
+    chat_id    bigint                      not null,
     message_id bigint                      not null,
     is_read    boolean                     not null,
-    text       text,
+    text       text                        null,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
     url        text                        null
@@ -44,8 +44,8 @@ EXECUTE FUNCTION update_timestamp();
 Create table if not exists matches
 (
     id         uuid primary key                     default uuid_generate_v4(),
-    url        text unique,
-    full_text  text,
+    url        text unique                 not null,
+    full_text  text                        null,
     chat_id    int                         null,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp
@@ -60,12 +60,12 @@ EXECUTE FUNCTION update_timestamp();
 Create table if not exists profile_reviewers
 (
     id         uuid primary key                     default uuid_generate_v4(),
-    chat_id    bigint,
-    text       text,
-    file_ids   int[],
+    chat_id    bigint                      not null,
+    text       text                        null,
+    file_ids   int[]                                default [],
     -- PENDING, WAITING, COMPLETE
     status     text                                 default 'WAITING',
-    score      int                         null,
+    score      int                                  default 0,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp
 );
@@ -78,11 +78,11 @@ EXECUTE FUNCTION update_timestamp();
 Create table if not exists tasks
 (
     id         uuid primary key                     default uuid_generate_v4(),
-    message    text,
+    message    text                        not null,
     -- WAITING, COMPLETE
-    status     text                                 DEFAULT 'WAITING',
-    request    text,
-    response   text,
+    status     text                        not null,
+    request    text                        not null,
+    response   text                        not null,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp
 );
@@ -95,7 +95,7 @@ EXECUTE FUNCTION update_timestamp();
 Create table if not exists superlikes
 (
     id                  uuid primary key                     default uuid_generate_v4(),
-    message             text,
+    message             text                        not null,
     -- WAITING, COMPLETE
     profile_reviewer_id uuid references profile_reviewers,
     status              text                                 DEFAULT 'WAITING',

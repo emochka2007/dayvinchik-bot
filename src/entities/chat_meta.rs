@@ -1,17 +1,15 @@
 use crate::common::{BotError, ChatId, MessageId};
-use crate::pg::pg::PgClient;
-use crate::r#mod::{ChatId, MessageId};
+use crate::pg::pg::{DbQuery, PgClient};
 use crate::td::td_json::{send, ClientId};
 use crate::td::td_manager::Task;
 use crate::td::td_message::MessageMeta;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
+use async_trait::async_trait;
 use log::{debug, error, info};
-use rust_tdlib::types::{
-    Chat, GetChat as TdGetChat, GetChatHistory as TdGetChatHistory, GetChats, Message, OpenChat,
-};
+use rust_tdlib::types::{Chat, GetChat as TdGetChat, GetChats, Message, OpenChat};
 use serde_json::{Error as SerdeError, Value};
-use tokio_postgres::Error;
+use tokio_postgres::{Error, Row};
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -21,6 +19,56 @@ pub struct ChatMeta {
     last_read_message_id: MessageId,
     title: String,
     last_message_id: MessageId,
+}
+
+#[async_trait]
+impl DbQuery for ChatMeta {
+    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<(), BotError> {
+        let query = "INSERT INTO chats (\
+        id, \
+        chat_id, \
+        last_read_message_id,\
+        last_message_id,\
+        title) \
+        VALUES ($1,$2, $3, $4,$5) ON CONFLICT (chat_id) \
+        DO UPDATE SET last_read_message_id = EXCLUDED.last_read_message_id, \
+        last_message_id = EXCLUDED.last_message_id ";
+        pg_client
+            .query(
+                query,
+                &[
+                    &self.id,
+                    &self.chat_id,
+                    &self.last_read_message_id,
+                    &self.last_message_id,
+                    &self.title,
+                ],
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn select_one(pg_client: &PgClient, id: Uuid) -> Result<Self, BotError>
+    where
+        Self: Sized,
+    {
+        let query = "SELECT * from chats WHERE id = $1 LIMIT 1";
+        let row = pg_client.query_one(query, &[&id]).await?;
+        Self::from_sql(row)
+    }
+
+    fn from_sql(row: Row) -> Result<Self, BotError>
+    where
+        Self: Sized,
+    {
+        Ok(Self {
+            id: row.try_get("id")?,
+            title: row.try_get("title")?,
+            last_read_message_id: row.try_get("last_read_message_id")?,
+            chat_id: row.try_get("chat_id")?,
+            last_message_id: row.try_get("last_message_id")?,
+        })
+    }
 }
 impl ChatMeta {
     pub fn chat_id(&self) -> &ChatId {
@@ -48,76 +96,11 @@ impl ChatMeta {
             last_message_id,
         }
     }
-    pub async fn insert_db(&self, client: &PgClient) -> () {
-        let query = "INSERT INTO chats (\
-        id, \
-        chat_id, \
-        last_read_message_id,\
-        last_message_id,\
-        title) \
-    VALUES ($1,$2, $3, $4,$5) ON CONFLICT (chat_id) \
-   DO UPDATE SET last_read_message_id = EXCLUDED.last_read_message_id, \
-   last_message_id = EXCLUDED.last_message_id ";
-        client
-            .query(
-                query,
-                &[
-                    &self.id,
-                    &self.chat_id,
-                    &self.last_read_message_id,
-                    &self.last_message_id,
-                    &self.title,
-                ],
-            )
-            .await
-            .unwrap();
-    }
-    pub async fn select_by_chat_id(chat_id: i64, client: &PgClient) -> Result<Self, Error> {
+    pub async fn select_by_chat_id(chat_id: i64, client: &PgClient) -> Result<Self, BotError> {
         let query = "SELECT * from chats WHERE chat_id = $1 LIMIT 1";
         let row = client.query_one(query, &[&chat_id]).await?;
-        Ok(Self {
-            id: row.try_get("id")?,
-            title: row.try_get("title")?,
-            last_read_message_id: row.try_get("last_read_message_id")?,
-            chat_id: row.try_get("chat_id")?,
-            last_message_id: row.try_get("last_message_id")?,
-        })
+        Self::from_sql(row)
     }
-}
-
-pub async fn td_get_chats(pg_client: &PgClient) -> Result<(), BotError> {
-    let public_chats = GetChats::builder().limit(100).build();
-    let message = serde_json::to_string(&public_chats)?;
-    Task::new(
-        message,
-        RequestKeys::GetChats,
-        ResponseKeys::Chats,
-        pg_client,
-    )
-    .await?;
-    Ok(())
-}
-
-pub async fn td_get_last_message(
-    pg_client: &PgClient,
-    chat_id: ChatId,
-    limit: i32,
-) -> Result<(), SerdeError> {
-    let history_message = TdGetChatHistory::builder()
-        .chat_id(chat_id)
-        .from_message_id(0)
-        .limit(limit)
-        .build();
-    let message = serde_json::to_string(&history_message)?;
-    Task::new(
-        message,
-        RequestKeys::GetChatHistory,
-        ResponseKeys::Messages,
-        pg_client,
-    )
-    .await
-    .unwrap();
-    Ok(())
 }
 
 pub async fn td_chat_info(pg_client: &PgClient, chat_id: ChatId) -> Result<(), BotError> {

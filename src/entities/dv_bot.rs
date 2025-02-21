@@ -1,7 +1,9 @@
 /* Day vinchik bot implementation */
-use crate::chats::{td_chat_info, td_get_chats, td_get_last_message, td_open_chat, ChatMeta};
 use crate::common::{BotError, ChatId};
 use crate::constants::{VINCHIK_CHAT, VINCHIK_CHAT_INT};
+use crate::entities::chat_meta::{
+    td_chat_info, td_get_chats, td_get_last_message, td_open_chat, ChatMeta,
+};
 use crate::messages::message::SendMessage;
 use crate::pg::pg::PgClient;
 use crate::td::td_manager::Task;
