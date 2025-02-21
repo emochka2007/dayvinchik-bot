@@ -1,5 +1,6 @@
-use crate::common::{ChatId, MessageId};
+use crate::common::{BotError, ChatId, MessageId};
 use crate::pg::pg::PgClient;
+use crate::r#mod::{ChatId, MessageId};
 use crate::td::td_json::{send, ClientId};
 use crate::td::td_manager::Task;
 use crate::td::td_message::MessageMeta;
@@ -84,17 +85,17 @@ impl ChatMeta {
     }
 }
 
-pub async fn td_get_chats(pg_client: &PgClient) {
+pub async fn td_get_chats(pg_client: &PgClient) -> Result<(), BotError> {
     let public_chats = GetChats::builder().limit(100).build();
-    let message = serde_json::to_string(&public_chats).unwrap();
+    let message = serde_json::to_string(&public_chats)?;
     Task::new(
         message,
         RequestKeys::GetChats,
         ResponseKeys::Chats,
         pg_client,
     )
-    .await
-    .unwrap();
+    .await?;
+    Ok(())
 }
 
 pub async fn td_get_last_message(
@@ -119,9 +120,9 @@ pub async fn td_get_last_message(
     Ok(())
 }
 
-pub async fn td_chat_info(pg_client: &PgClient, chat_id: ChatId) -> Result<(), Error> {
+pub async fn td_chat_info(pg_client: &PgClient, chat_id: ChatId) -> Result<(), BotError> {
     let message = TdGetChat::builder().chat_id(chat_id).build();
-    let chat_history_msg = serde_json::to_string(&message).unwrap();
+    let chat_history_msg = serde_json::to_string(&message)?;
     Task::new(
         chat_history_msg,
         RequestKeys::GetChat,
@@ -131,32 +132,33 @@ pub async fn td_chat_info(pg_client: &PgClient, chat_id: ChatId) -> Result<(), E
     .await?;
     Ok(())
 }
-
-pub async fn get_chat(
-    json_str: Value,
-    pg_client: &PgClient,
-) -> Result<Option<ChatMeta>, SerdeError> {
+//todo mb parser for all json struct
+pub async fn get_chat(json_str: Value, pg_client: &PgClient) -> Result<Option<ChatMeta>, BotError> {
     let chat: Chat = serde_json::from_value(json_str)?;
     info!("Get chat");
     // if chat.id < 0 - it's a channel we cannot write to
     if chat.id() < 0 {
         return Ok(None);
     }
-    let last_message = chat.last_message().as_ref().unwrap();
-    let mut last_received_message_id = last_message.id();
-    // if message is outgoing, then it means that we've sent
-    if last_message.is_outgoing() {
-        last_received_message_id = 0;
+    match chat.last_message().as_ref() {
+        Some(last_message) => {
+            let mut last_received_message_id = last_message.id();
+            // if message is outgoing, then it means that we've sent
+            if last_message.is_outgoing() {
+                last_received_message_id = 0;
+            }
+            let chat_meta = ChatMeta::new(
+                chat.id(),
+                chat.last_read_inbox_message_id(),
+                last_received_message_id,
+                chat.title().to_string(),
+            );
+            chat_meta.insert_db(pg_client).await;
+            debug!("{:?}", chat_meta);
+            Ok(Some(chat_meta))
+        }
+        None => Err(),
     }
-    let chat_meta = ChatMeta::new(
-        chat.id(),
-        chat.last_read_inbox_message_id(),
-        last_received_message_id,
-        chat.title().to_string(),
-    );
-    chat_meta.insert_db(pg_client).await;
-    debug!("{:?}", chat_meta);
-    Ok(Some(chat_meta))
 }
 
 pub async fn td_open_chat(pg_client: &PgClient, chat_id: ChatId) -> Result<(), Error> {

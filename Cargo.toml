@@ -23,6 +23,8 @@ lazy_static = "1.5.0"
 deadpool-postgres = "0.14.1"
 deadpool = "0.12.2"
 base64 = "0.22.1"
+thiserror = { version = "2", features = ["default", "std"] }
+async-trait = "0.1.86"
 
 [dev-dependencies]
 console-subscriber = "0.4.1"

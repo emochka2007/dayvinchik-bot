@@ -1,11 +1,10 @@
-use crate::common::{ChatId, FileId, MessageId};
+use crate::common::{BotError, ChatId, FileId, MessageId};
 use crate::entities::profile_match::ProfileMatch;
 use crate::entities::profile_reviewer::{ProfileReviewer, ProfileReviewerStatus};
 use crate::pg::pg::PgClient;
 use crate::td::td_file::td_file_download;
 use log::{debug, error};
-use rust_tdlib::tdjson::ClientId;
-use rust_tdlib::types::{Chat, Message, MessageContent, Messages, TextEntity, TextEntityType};
+use rust_tdlib::types::{Message, MessageContent, Messages, TextEntity, TextEntityType};
 use serde_json::Value;
 use tokio_postgres::Error;
 use uuid::Uuid;
@@ -23,17 +22,19 @@ pub struct MessageMeta {
 }
 
 impl MessageMeta {
-    pub fn from_message(msg: &Message, last_read_inbox_message_id: Option<MessageId>) -> Self {
+    pub fn from_message(
+        msg: &Message,
+        last_read_inbox_message_id: Option<MessageId>,
+    ) -> Result<Self, BotError> {
         let mut is_read = true;
-        if !msg.is_outgoing() {
-            if last_read_inbox_message_id.is_some()
-                && msg.id() > last_read_inbox_message_id.unwrap()
-            {
-                is_read = false;
-            }
+        if !msg.is_outgoing()
+            && last_read_inbox_message_id.is_some()
+            && msg.id() > last_read_inbox_message_id.unwrap()
+        {
+            is_read = false;
         }
-        let parsed_content = match_message_content(msg.content().clone()).unwrap();
-        Self {
+        let parsed_content = match_message_content(msg.content().clone())?;
+        Ok(Self {
             id: Uuid::new_v4().to_string(),
             message_id: msg.id(),
             chat_id: msg.chat_id(),
@@ -42,7 +43,7 @@ impl MessageMeta {
             created_at: msg.date(),
             url: parsed_content.url,
             file_ids: parsed_content.file_ids,
-        }
+        })
     }
     pub fn is_match(&self) -> bool {
         //todo take from config
@@ -148,13 +149,14 @@ fn get_url_entity(entities: &Vec<TextEntity>, content: &mut ParseMessageContent)
     }
 }
 
-pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<(), serde_json::Error> {
+pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<(), BotError> {
     let messages: Messages = serde_json::from_value(json_str)?;
 
+    error!("messages {:?}", messages);
     for message in messages.messages() {
         let message = message.as_ref().unwrap();
-        let parsed_message = MessageMeta::from_message(message, None);
-        parsed_message.insert_db(pg_client).await.unwrap();
+        let parsed_message = MessageMeta::from_message(message, None)?;
+        parsed_message.insert_db(pg_client).await?;
         if parsed_message.is_match() {
             let profile_match = ProfileMatch {
                 url: parsed_message.url().as_ref().unwrap().to_string(),

@@ -1,14 +1,16 @@
+use crate::common::BotError;
 use crate::entities::dv_bot::DvBot;
 use crate::file::{get_image_with_retries, image_to_base64, move_file};
 use crate::openapi::llm_api::OpenAI;
-use crate::pg::pg::PgClient;
+use crate::pg::pg::{DbQuery, DbStatusQuery, PgClient};
 use crate::prompts::Prompt;
 use crate::td::td_json::ClientId;
 use log::{debug, error};
+use std::io;
 use std::time::Duration;
 use tokio::time::sleep;
 use tokio_postgres::types::IsNull::No;
-use tokio_postgres::{Client, Error, Row};
+use tokio_postgres::{Client, Error as PostgresError, Row};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -30,6 +32,8 @@ pub struct ProfileReviewer {
     status: ProfileReviewerStatus,
     file_ids: Option<Vec<i32>>,
 }
+impl DbQuery for ProfileReviewer {}
+impl DbStatusQuery for ProfileReviewer {}
 // todo implement diff struct ProfileReviewerDb
 impl ProfileReviewer {
     pub fn new(chat_id: i64, text: &String, status: ProfileReviewerStatus) -> Self {
@@ -61,7 +65,7 @@ impl ProfileReviewer {
     pub fn main_file(&self) -> i32 {
         *self.file_ids.clone().unwrap().get(0).unwrap()
     }
-    pub async fn get_waiting(client: &PgClient) -> Result<ProfileReviewer, Error> {
+    pub async fn get_waiting(client: &PgClient) -> Result<ProfileReviewer, PostgresError> {
         let query = "SELECT id::text, chat_id, text, file_ids FROM profile_reviewers WHERE status='WAITING' LIMIT 1";
         match client.query_one(query, &[]).await {
             Ok(row) => Self::from_sql(row),
@@ -71,7 +75,7 @@ impl ProfileReviewer {
             }
         }
     }
-    pub async fn get_completed(client: &PgClient) -> Result<ProfileReviewer, Error> {
+    pub async fn get_completed(client: &PgClient) -> Result<ProfileReviewer, PostgresError> {
         let query = "SELECT id::text, chat_id, text, file_ids,score FROM profile_reviewers WHERE status='COMPLETE' LIMIT 1";
         match client.query_one(query, &[]).await {
             Ok(row) => Self::from_sql(row),
@@ -82,10 +86,10 @@ impl ProfileReviewer {
         }
     }
 
-    // pub async fn get_by_file_id(pg_client: &PgClient) -> Result<ProfileReviewer, Error> {}
+    // pub async fn get_by_file_id(pg_client: &PgClient) -> Result<ProfileReviewer, PostgresError> {}
 
     //todo convert status
-    fn from_sql(row: Row) -> Result<ProfileReviewer, Error> {
+    fn from_sql(row: Row) -> Result<ProfileReviewer, PostgresError> {
         Ok(Self {
             chat_id: row.try_get("chat_id")?,
             score: Some(row.try_get("score").unwrap_or_default()),
@@ -96,7 +100,7 @@ impl ProfileReviewer {
         })
     }
 
-    pub async fn run(client: &PgClient) -> Result<ProfileReviewer, Error> {
+    pub async fn run(client: &PgClient) -> Result<ProfileReviewer, PostgresError> {
         let query = "SELECT id::text, chat_id, text, file_ids FROM profile_reviewers WHERE status='WAITING' LIMIT 1";
         match client.query_one(query, &[]).await {
             Ok(row) => {
@@ -115,20 +119,20 @@ impl ProfileReviewer {
             }
         }
     }
-    pub async fn set_pending(id: String, client: &PgClient) -> Result<(), Error> {
+    pub async fn set_pending(id: String, client: &PgClient) -> Result<(), PostgresError> {
         let query = "UPDATE profile_reviewers SET status='PENDING' WHERE id=$1";
         let id = &Uuid::parse_str(&id).unwrap();
         client.query(query, &[id]).await?;
         Ok(())
     }
-    pub async fn set_processed(id: String, client: &PgClient) -> Result<(), Error> {
+    pub async fn set_processed(id: String, client: &PgClient) -> Result<(), PostgresError> {
         let query = "UPDATE profile_reviewers SET status='PROCESSED' WHERE id=$1";
         let id = &Uuid::parse_str(&id).unwrap();
         client.query(query, &[id]).await?;
         Ok(())
     }
 
-    pub async fn acquire(client: &PgClient) -> Result<Option<()>, Error> {
+    pub async fn acquire(client: &PgClient) -> Result<Option<()>, PostgresError> {
         let query =
             "SELECT id from profile_reviewers WHERE status = 'PENDING' OR status='COMPLETE'";
         let rows_len = client.query(query, &[]).await?.len();
@@ -152,7 +156,7 @@ impl ProfileReviewer {
         }
     }
 
-    pub async fn get_ready_to_proceed(client: &PgClient) -> Result<Option<()>, Error> {
+    pub async fn get_ready_to_proceed(client: &PgClient) -> Result<Option<()>, PostgresError> {
         let query = "SELECT id from profile_reviewers WHERE status = 'PENDING' OR status='WAITING'";
         match client.query(query, &[]).await {
             Ok(rows) => {
@@ -169,7 +173,7 @@ impl ProfileReviewer {
         }
     }
 
-    pub async fn insert_db(&self, client: &PgClient) -> Result<(), Error> {
+    pub async fn insert_db(&self, client: &PgClient) -> Result<(), PostgresError> {
         if let Ok(Some(_)) = Self::acquire(client).await {
             let query = "INSERT into profile_reviewers (chat_id, text, status,file_ids) \
         VALUES ($1,$2,$3,$4)";
@@ -183,7 +187,7 @@ impl ProfileReviewer {
         Ok(())
     }
 
-    pub async fn finalize(&self, client: &PgClient, score: i32) -> Result<(), Error> {
+    pub async fn finalize(&self, client: &PgClient, score: i32) -> Result<(), PostgresError> {
         let query = "UPDATE profile_reviewers SET \
         status='COMPLETE', \
         score=$1 \
@@ -192,7 +196,7 @@ impl ProfileReviewer {
         client.query(query, &[&score, id]).await?;
         Ok(())
     }
-    pub async fn to_failed(&self, pg_client: &PgClient) -> Result<(), Error> {
+    pub async fn to_failed(&self, pg_client: &PgClient) -> Result<(), PostgresError> {
         let query = "UPDATE profile_reviewers SET \
         status='FAILED' \
         WHERE id=$1";
@@ -200,39 +204,45 @@ impl ProfileReviewer {
         pg_client.query(query, &[id]).await?;
         Ok(())
     }
-    pub async fn start(pg_client: &PgClient) -> Result<(), Error> {
+    pub async fn start(pg_client: &PgClient) -> Result<(), BotError> {
         match ProfileReviewer::acquire(pg_client).await? {
             Some(_) => {
                 let last_pending = ProfileReviewer::run(pg_client).await?;
                 let open_ai = OpenAI::new();
                 let prompt = Prompt::analyze_alt();
                 let path_to_img = format!("profile_images/{}.png", last_pending.main_file());
-                if let Ok(base64_image) = get_image_with_retries(&path_to_img).await {
-                    let response = open_ai
-                        .send_sys_image_message(prompt.system.unwrap(), prompt.user, base64_image)
-                        .await
-                        .unwrap();
-                    match response.parse::<i32>() {
-                        Ok(score) => {
-                            last_pending
-                                .finalize(pg_client, score)
-                                .await
-                                .expect("TODO: panic message");
-                            let reviewed_file =
-                                format!("reviewed_images/{}.png", last_pending.id());
-                            move_file(&path_to_img, &reviewed_file).expect("TODO: panic message");
-                        }
-                        Err(e) => {
-                            last_pending.to_failed(&pg_client).await?;
-                            error!("Response parsing error {:?}", e)
+                match get_image_with_retries(&path_to_img).await {
+                    Ok(base64_image) => {
+                        let response = open_ai
+                            .send_sys_image_message(
+                                prompt.system.unwrap(),
+                                prompt.user,
+                                base64_image,
+                            )
+                            .await
+                            .unwrap();
+                        match response.parse::<i32>() {
+                            Ok(score) => {
+                                last_pending
+                                    .finalize(pg_client, score)
+                                    .await
+                                    .expect("TODO: panic message");
+                                let reviewed_file =
+                                    format!("reviewed_images/{}.png", last_pending.id());
+                                move_file(&path_to_img, &reviewed_file)
+                                    .expect("TODO: panic message");
+                            }
+                            Err(e) => {
+                                last_pending.to_failed(&pg_client).await?;
+                                error!("Response parsing error {:?}", e);
+                                return Err(e);
+                            }
                         }
                     }
-                } else {
-                    last_pending.to_failed(&pg_client).await?;
-                    error!(
-                        "Couldn't find the image_to_base64 file, expected {}",
-                        path_to_img
-                    );
+                    Err(e) => {
+                        last_pending.to_failed(&pg_client).await?;
+                        return Err(e);
+                    }
                 }
             }
             None => {}

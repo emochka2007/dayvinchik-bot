@@ -76,7 +76,6 @@ impl Task {
         Ok(task)
     }
     pub async fn insert_db(&self, pg_client: &PgClient) -> Result<(), Error> {
-        debug!("{:?}", self);
         let query = "Insert into tasks \
         (id, message, status, response,request)
         VALUES

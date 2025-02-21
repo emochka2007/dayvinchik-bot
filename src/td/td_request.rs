@@ -1,6 +1,6 @@
+use log::error;
 use std::error::Error;
 use std::io;
-use log::error;
 use tokio_postgres::types::{FromSql, Type};
 
 #[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]

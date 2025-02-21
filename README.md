@@ -1,22 +1,28 @@
-todo: unread chats
+## todo:
 
-
+- Custom errors
+- Remove all unwraps and expect
+- Normal logging
+- Dynamic superlike prompt from LLM
+- Superlike generation
+- Auto-responder
+- SQL traits common and queries fix
 
 ## Altushka Bot
+
 - Identifies altushka from chat bot using LLM with a score, and will talk for u
 
 ### Current implementation
+
 - Callback executor with a queue
 - move all global states to PG
 - vectorize data in pg
 - educating tool to store only correct data
-- OpenAi analyzes photo and creates a superlike message
 - send out to all matches MSG_STARTER
 - multiple variants to start (love ur style, nyashka, wanna go for a walk) conside
 - iterate over cities with one account.
-- all db entities in one folder 
+- all db entities in one folder
 - vectorize all of my chats and store in pg
-- querybuilder psql
 
 - Roadmap
     - TDlib setup
@@ -31,8 +37,8 @@ todo: unread chats
     - Actors. The behaviour of the actor depends on the chosen.
       Likes and dislikes also depends on the actor
       Each of the actors has different prompt, different behaviour
-      - Like/Communicate actor
-      - Custom actors for users
+        - Like/Communicate actor
+        - Custom actors for users
     - Stats.
         - Log each profile. Photo + name. assign to it `PROFILE_ID`  `uuid`
         - Save matches
@@ -40,13 +46,15 @@ todo: unread chats
         - save each dialogue in a separate file
 
 -- features --
+
 - Random timestamp between answers
 - Goals and checks in chat, getting info about girl (name, age, activity, favourite animal)
 - analyze ignored chats (no answer for more than 24 hrs)
 - Find altushka from the photo and identify.
-- 
+-
 
 ## Done
+
 - Detect unread messages
 - list all active matches
 - Get the match message

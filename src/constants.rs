@@ -1,7 +1,6 @@
-use crate::common::ChatId;
+use crate::common::{BotError, ChatId};
 use crate::td::td_request::RequestKeys;
 use lazy_static::lazy_static;
-use log::{error, info};
 use std::sync::Mutex;
 
 lazy_static! {
@@ -11,12 +10,12 @@ lazy_static! {
 pub const VINCHIK_CHAT: &str = "1234060895";
 pub const VINCHIK_CHAT_INT: ChatId = 1234060895;
 
-pub fn get_last_request() -> RequestKeys {
-    *LAST_REQUEST.lock().expect("Error")
+pub fn get_last_request() -> Result<RequestKeys, BotError> {
+    Ok(*LAST_REQUEST.lock()?)
 }
 
-pub fn update_last_request(value: RequestKeys) {
-    // error!("updating last tdlib {:?}", value);
-    let mut last_msg = LAST_REQUEST.lock().unwrap();
+pub fn update_last_request(value: RequestKeys) -> Result<(), BotError> {
+    let mut last_msg = LAST_REQUEST.lock()?;
     *last_msg = value;
+    Ok(())
 }

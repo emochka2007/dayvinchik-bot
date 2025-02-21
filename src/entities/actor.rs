@@ -1,3 +1,4 @@
+use crate::common::BotError;
 use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_reviewer::ProfileReviewer;
 use crate::file::{image_to_base64, move_file};
@@ -42,10 +43,9 @@ impl Actor {
         }
     }
 
-    pub async fn analyze(&self, pg_client: &PgClient) -> Result<(), Error> {
+    /// First we update the chat and only after update latest messages for dv bot
+    pub async fn analyze(&self, pg_client: &PgClient) -> Result<(), BotError> {
         info!("Analyzing...");
-        // First we update the chat and only after update latest messages for dv bot
-        // todo if chats empty run or force flag mb
         DvBot::refresh(pg_client).await?;
         DvBot::read_last_message(pg_client).await?;
         loop {
@@ -62,8 +62,7 @@ impl Actor {
                                 profile_reviewer.id().to_string(),
                                 pg_client,
                             )
-                                .await
-                                .unwrap();
+                            .await?;
                             DvBot::read_last_message(pg_client).await?;
                         }
                     }

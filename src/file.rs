@@ -1,3 +1,4 @@
+use crate::common::{StdError, StdResult};
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use log::error;
@@ -21,7 +22,7 @@ pub fn get_project_root() -> io::Result<PathBuf> {
             return Ok(PathBuf::from(p));
         }
     }
-    Err(io::Error::new(
+    Err(StdError::new(
         io::ErrorKind::NotFound,
         "Ran out of places to find Cargo.toml",
     ))
@@ -31,7 +32,7 @@ pub fn file_log(data: String) {
     write_context.write_all(data.as_bytes()).unwrap();
 }
 
-pub fn log_append(data: String, path: &str) -> std::io::Result<()> {
+pub fn log_append(data: String, path: &str) -> StdResult {
     let data = format!("{data}\n");
     let mut file = OpenOptions::new()
         .write(true)
@@ -48,10 +49,9 @@ pub fn read_json_file(path: &str) -> io::Result<String> {
     file.read_to_string(&mut contents)?;
     Ok(contents)
 }
-pub fn move_file(src: &str, dest: &str) -> io::Result<()> {
+pub fn move_file(src: &str, dest: &str) -> StdResult {
     fs::rename(src, dest).unwrap_or_else(|_err| {
-        // todo resolve why error is thrown even though the move is made
-        // error!("Failed to move file: {}", err);
+        error!("Failed to move file: {}", _err);
     });
     Ok(())
 }
@@ -68,23 +68,17 @@ pub async fn get_image_with_retries(path_to_img: &str) -> io::Result<String> {
                 }
                 Err(e) => {
                     attempts += 1;
-                    // error!(
-                    //     "Failed to load image to base64 (attempt {}/{}): {}",
-                    //     attempts, max_attempts, e
-                    // );
-
                     if attempts >= max_attempts {
-                        // error!(
-                        //     "Max attempts reached. Image file still not found at '{}'. \
-                        //              Marked as failed and returning.",
-                        //     path_to_img
-                        // );
                         return Err(io::Error::new(
                             io::ErrorKind::TimedOut,
-                            "Ran out of places to find Cargo.toml",
+                            format!(
+                                "Max attempts reached. Image file still not found at '{}'. \
+                                     Marked as failed and returning.",
+                                path_to_img
+                            ),
                         ));
                     } else {
-                        sleep(Duration::from_secs(1)).await;
+                        sleep(Duration::from_secs(2)).await;
                     }
                 }
             }
