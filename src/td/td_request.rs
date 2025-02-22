@@ -1,4 +1,3 @@
-use log::error;
 use std::error::Error;
 use std::io;
 use tokio_postgres::types::{FromSql, Type};

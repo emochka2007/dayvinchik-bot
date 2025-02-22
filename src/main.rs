@@ -1,3 +1,4 @@
+#![feature(error_generic_member_access)]
 mod auth;
 mod common;
 mod constants;
@@ -48,17 +49,17 @@ async fn main() -> Result<(), BotError> {
             let msg = tokio::task::spawn_blocking(|| {
                 receive(0.1) // td_receive
             })
-            .await
-            .unwrap_or_else(|e| {
-                error!("{:?}", e);
-                panic!("Tokio task spawn blocking");
-            });
+                .await
+                .unwrap_or_else(|e| {
+                    error!("{:?}", e);
+                    panic!("Tokio task spawn blocking");
+                });
 
             if let Some(x) = msg {
                 // info!("X -> {x}");
                 parse_message(&x, &client)
                     .await
-                    .unwrap_or_else(|e| error!("{:?}", e));
+                    .unwrap_or_else(|e| error!("Parse message {:?}", e));
             }
         }
     });
@@ -73,21 +74,30 @@ async fn main() -> Result<(), BotError> {
             cron_manager(client_id, &client).await;
         });
     }
+    let client = pool
+        .get()
+        .await
+        .unwrap_or_else(|e| panic!("Couldn't get the client from pool {:?}", e));
 
-    if let Ok(client) = pool.get().await {
+    tokio::spawn(async move {
         let dv_bot = DvBot::new(&client);
-        tokio::spawn(async move {
-            match dotenvy::var("UPDATE_CHAT") {
-                Ok(_value) => {
-                    dv_bot.on_init().await.unwrap();
-                }
-                Err(e) => {
-                    debug!("UPDATE_CHAT var is not set {:?}", e);
-                }
+        match dotenvy::var("UPDATE_CHAT") {
+            Ok(_value) => {
+                dv_bot.on_init().await.unwrap_or_else(|e| {
+                    error!("DV_BOT init error {:?}", e);
+                });
             }
-            Actor::new(ActorType::DEFAULT, 50).analyze(&client).await?;
-        });
-    }
+            Err(e) => {
+                debug!("UPDATE_CHAT var is not set {:?}", e);
+            }
+        }
+        Actor::new(ActorType::DEFAULT, 50)
+            .analyze(&client)
+            .await
+            .unwrap_or_else(|e| {
+                error!("Actor analyze error {:?}", e);
+            });
+    });
 
     let client = pool.get().await?;
     tokio::spawn(async move {
@@ -95,14 +105,13 @@ async fn main() -> Result<(), BotError> {
         loop {
             ProfileReviewer::start(&client)
                 .await
-                .unwrap_or_else(|e| error!("{:?}", e));
-            sleep(Duration::from_secs(5)).await;
+                .unwrap_or_else(|e| error!("ProfileReviewer start {:?}", e));
+            sleep(Duration::from_secs(10)).await;
         }
     });
 
     let mode = env::var("MODE")?;
-    if mode == "CRON" {
-    } else {
+    if mode == "CRON" {} else {
         loop {
             if let Ok(input) = input() {
                 if let Ok(client) = pool.get().await {

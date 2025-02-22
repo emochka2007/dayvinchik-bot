@@ -1,12 +1,9 @@
 ## todo:
 
-- Custom errors
-- Remove all unwraps and expect
-- Normal logging
+- todo Fix download file system
 - Dynamic superlike prompt from LLM
 - Superlike generation
 - Auto-responder
-- SQL traits common and queries fix
 
 ## Altushka Bot
 
@@ -62,4 +59,5 @@
 - Store the currently reviewing profi to send all photos to gpt to analuze
 - Insert each review inside the db with the status `PENDING`, 'COMPLETED'
 
+- Custom errors
  

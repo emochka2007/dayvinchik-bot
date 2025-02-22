@@ -21,6 +21,7 @@ Makeup: Examine the style and application of makeup to see if it fits within alt
 Overall Impression: Summarize your findings based on the visual elements observed.
 After analyzing these elements, provide a confidence score from 1 to 100 on whether the character can be considered 'alternative'.
 Please return just a number for the first photo, only number.
+If you unable to return an answer, just return 0 (only-digit)
 ".to_string();
         let any_desc = sys_description.to_string();
         Self {

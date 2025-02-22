@@ -1,15 +1,13 @@
-/* Day vinchik bot implementation */
 use crate::common::{BotError, ChatId};
 use crate::constants::{VINCHIK_CHAT, VINCHIK_CHAT_INT};
-use crate::entities::chat_meta::{
-    td_chat_info, td_get_chats, td_get_last_message, td_open_chat, ChatMeta,
-};
+use crate::entities::chat_meta::{td_chat_info, td_open_chat, ChatMeta};
 use crate::messages::message::SendMessage;
 use crate::pg::pg::PgClient;
+use crate::td::td_chats::td_get_chats;
 use crate::td::td_manager::Task;
+use crate::td::td_message::td_get_last_message;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
-use serde_json::Error;
 
 pub struct DvBot<'a> {
     pg_client: &'a PgClient,
@@ -89,7 +87,7 @@ impl<'a> DvBot<'a> {
         let limit = 1;
         let chat = ChatMeta::select_by_chat_id(VINCHIK_CHAT_INT, pg_client).await?;
         td_get_last_message(pg_client, *chat.chat_id(), limit).await?;
-        Self::update_bot_last_message(pg_client, *chat.chat_id()).await?;
+        // Self::update_bot_last_message(pg_client, *chat.chat_id()).await?;
         Ok(())
     }
 

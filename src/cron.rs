@@ -1,10 +1,9 @@
 use crate::pg::pg::PgClient;
 use crate::td::td_json::ClientId;
 use crate::td::td_manager::TdManager;
-use log::{error, info};
-use std::str::FromStr;
+use log::info;
 use std::time::Duration;
-use tokio::time::{interval, sleep};
+use tokio::time::interval;
 
 pub async fn cron_manager(client_id: ClientId, pg_client: &PgClient) {
     let mut interval = interval(Duration::from_secs(3));

@@ -1,4 +1,3 @@
-use crate::td::td_request::RequestKeys;
 use deadpool_postgres::PoolError;
 use rust_tdlib::tdjson::set_log_verbosity_level;
 use std::backtrace::Backtrace;
@@ -63,12 +62,6 @@ pub enum BotError {
         #[backtrace]
         backtrace: Backtrace,
     },
-    // #[error("Mutex poisoned: {source}")]
-    // MutexPoison {
-    //     source: String,
-    //     #[backtrace]
-    //     backtrace: Backtrace,
-    // },
 }
 
 pub fn env_init() {
@@ -78,12 +71,4 @@ pub fn env_init() {
     dotenvy::dotenv().unwrap_or_else(|_e| {
         panic!("Not enable to initialize dotenvy");
     });
-}
-impl From<std::sync::PoisonError<std::sync::MutexGuard<'_, RequestKeys>>> for BotError {
-    fn from(err: std::sync::PoisonError<std::sync::MutexGuard<RequestKeys>>) -> Self {
-        BotError::MutexPoison {
-            source: format!("{}", err),
-            backtrace: Backtrace::capture(),
-        }
-    }
 }

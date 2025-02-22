@@ -1,14 +1,14 @@
 use crate::common::{BotError, ChatId, MessageId};
 use crate::pg::pg::{DbQuery, PgClient};
-use crate::td::td_json::{send, ClientId};
 use crate::td::td_manager::Task;
-use crate::td::td_message::MessageMeta;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
 use async_trait::async_trait;
-use log::{debug, error, info};
-use rust_tdlib::types::{Chat, GetChat as TdGetChat, GetChats, Message, OpenChat};
-use serde_json::{Error as SerdeError, Value};
+use log::{debug, info};
+use rust_tdlib::types::{Chat, GetChat as TdGetChat, OpenChat};
+use serde_json::Value;
+use std::io;
+use std::io::ErrorKind;
 use tokio_postgres::{Error, Row};
 use uuid::Uuid;
 
@@ -136,11 +136,11 @@ pub async fn get_chat(json_str: Value, pg_client: &PgClient) -> Result<Option<Ch
                 last_received_message_id,
                 chat.title().to_string(),
             );
-            chat_meta.insert_db(pg_client).await;
+            chat_meta.insert(pg_client).await?;
             debug!("{:?}", chat_meta);
             Ok(Some(chat_meta))
         }
-        None => Err(),
+        None => Err(io::Error::new(ErrorKind::InvalidInput, "Last message not in chat").into()),
     }
 }
 

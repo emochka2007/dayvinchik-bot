@@ -1,8 +1,8 @@
 use crate::common::BotError;
 use crate::file::image_to_base64;
-use crate::openapi::openai::{ChatCompletionResponse, Choice};
+use crate::openapi::openai::ChatCompletionResponse;
 use crate::prompts::Prompt;
-use log::{debug, info};
+use log::info;
 use reqwest::Client;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};

@@ -1,9 +1,9 @@
 use crate::common::BotError;
 use crate::entities::dv_bot::DvBot;
-use crate::entities::profile_reviewer::ProfileReviewer;
-use crate::pg::pg::PgClient;
+use crate::entities::profile_reviewer::{ProfileReviewer, ProfileReviewerStatus};
+use crate::pg::pg::{DbStatusQuery, PgClient};
 use crate::prompts::Prompt;
-use log::{info};
+use log::{error, info};
 use std::time::Duration;
 use tokio::time::sleep;
 use uuid::Uuid;
@@ -42,36 +42,29 @@ impl Actor {
     /// First we update the chat and only after update latest messages for dv bot
     pub async fn analyze(&self, pg_client: &PgClient) -> Result<(), BotError> {
         info!("Analyzing...");
+        //break statement mb
         DvBot::refresh(pg_client).await?;
         DvBot::read_last_message(pg_client).await?;
         loop {
-            let _ = ProfileReviewer::get_ready_to_proceed(pg_client).await.is_ok();
+            sleep(Duration::from_secs(5)).await;
+            if let Some(completed_reviewer) =
+                ProfileReviewer::get_ready_to_proceed(pg_client).await?
             {
-                match ProfileReviewer::get_completed(pg_client).await {
-                    Ok(profile_reviewer) => {
-                        if let Some(score) = profile_reviewer.score() {
-                            if *score >= self.score_threshold {
-                                DvBot::send_like(pg_client).await?;
-                            } else {
-                                DvBot::send_dislike(pg_client).await?;
-                            }
-                            ProfileReviewer::set_processed(
-                                profile_reviewer.id().to_string(),
-                                pg_client,
-                            )
-                                .await?;
-                            DvBot::read_last_message(pg_client).await?;
-                        }
+                if let Some(score) = completed_reviewer.score() {
+                    if *score >= self.score_threshold {
+                        DvBot::send_like(pg_client).await?;
+                    } else {
+                        DvBot::send_dislike(pg_client).await?;
                     }
-                    Err(e) => {
-                        // error!("Error getting completed {:?}", e);
-                        DvBot::read_last_message(pg_client).await?;
-                    }
+                    completed_reviewer
+                        .update_status(pg_client, ProfileReviewerStatus::Processed)
+                        .await?;
+                    DvBot::read_last_message(pg_client).await?;
+                } else {
+                    continue;
                 }
             }
-
-            sleep(Duration::from_secs(10)).await;
         }
-        // Ok(())
+        Ok(())
     }
 }

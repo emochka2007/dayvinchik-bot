@@ -11,11 +11,11 @@ pub const VINCHIK_CHAT: &str = "1234060895";
 pub const VINCHIK_CHAT_INT: ChatId = 1234060895;
 
 pub fn get_last_request() -> Result<RequestKeys, BotError> {
-    Ok(*LAST_REQUEST.lock()?)
+    Ok(*LAST_REQUEST.lock().unwrap())
 }
 
 pub fn update_last_request(value: RequestKeys) -> Result<(), BotError> {
-    let mut last_msg = LAST_REQUEST.lock()?;
+    let mut last_msg = LAST_REQUEST.lock().unwrap();
     *last_msg = value;
     Ok(())
 }

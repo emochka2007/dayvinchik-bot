@@ -134,7 +134,7 @@ pub trait DbStatusQuery {
     async fn get_by_status_one(
         pg_client: &PgClient,
         status: Self::Status,
-    ) -> Result<Self, BotError>
+    ) -> Result<Option<Self>, BotError>
     where
         Self: Sized;
 }

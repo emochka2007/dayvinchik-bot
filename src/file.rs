@@ -1,11 +1,11 @@
-use crate::common::{StdError, StdResult};
+use crate::common::StdResult;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use log::error;
 use std::ffi::OsString;
 use std::fs::{read_dir, File, OpenOptions};
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::{env, fs, io};
 use tokio::time::sleep;
@@ -22,7 +22,7 @@ pub fn get_project_root() -> io::Result<PathBuf> {
             return Ok(PathBuf::from(p));
         }
     }
-    Err(StdError::new(
+    Err(io::Error::new(
         io::ErrorKind::NotFound,
         "Ran out of places to find Cargo.toml",
     ))
@@ -55,18 +55,21 @@ pub fn move_file(src: &str, dest: &str) -> StdResult {
     });
     Ok(())
 }
-pub async fn get_image_with_retries(path_to_img: &str) -> io::Result<String> {
+pub async fn get_image_with_retries(path_to_img: &str, local_path: &str) -> io::Result<String> {
+    if let Ok(base64_image) = image_to_base64(local_path) {
+        return Ok(base64_image);
+    }
     let base64_image = {
         //todo config
         let max_attempts = 3;
         let mut attempts = 0;
 
         loop {
-            match image_to_base64(&path_to_img) {
+            match image_to_base64(path_to_img) {
                 Ok(img) => {
                     break img;
                 }
-                Err(e) => {
+                Err(_e) => {
                     attempts += 1;
                     if attempts >= max_attempts {
                         return Err(io::Error::new(
@@ -92,4 +95,13 @@ pub fn image_to_base64(path: &str) -> io::Result<String> {
     file.read_to_end(&mut buffer)?;
     let encoded = BASE64_STANDARD.encode(buffer);
     Ok(encoded)
+}
+
+pub fn file_exists(path: &str) -> bool {
+    let file_path = Path::new(path);
+
+    if file_path.exists() {
+        return true;
+    }
+    false
 }

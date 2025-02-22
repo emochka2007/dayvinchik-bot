@@ -1,12 +1,14 @@
+use deadpool_postgres::GenericClient;
+use crate::common::BotError;
 use crate::constants::update_last_request;
-use crate::pg::pg::{PgClient, PgConnect};
+use crate::pg::pg::PgClient;
 use crate::td::td_json::send;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
-use log::{debug, error, info};
+use log::info;
 use rust_tdlib::tdjson::ClientId;
-use std::time::Duration;
-use tokio_postgres::{Client, Error, Row};
+use tokio_postgres::types::IsNull::No;
+use tokio_postgres::{Error, Row};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy)]
@@ -107,23 +109,29 @@ impl Task {
             response: row.try_get("response")?,
         })
     }
-    pub async fn first_waiting(pg_client: &PgClient) -> Result<Self, Error> {
+    pub async fn first_waiting(pg_client: &PgClient) -> Result<Option<Self>, Error> {
         let query = "SELECT * from tasks WHERE status='WAITING' ORDER BY created_at LIMIT 1";
-        let row = pg_client.query_one(query, &[]).await?;
-        Self::parse_row(row)
+        let row_opt = pg_client.query_opt(query, &[]).await?;
+        match row_opt {
+            Some(row) => Ok(Some(Self::parse_row(row)?)),
+            None => Ok(None),
+        }
     }
     pub async fn first_pending(
         pg_client: &PgClient,
         request_key: &RequestKeys,
         response_key: &ResponseKeys,
-    ) -> Result<Self, Error> {
+    ) -> Result<Option<Self>, Error> {
         let query = "SELECT * from tasks WHERE status='PENDING' \
         AND request=$1 AND response = $2 \
         ORDER BY created_at LIMIT 1";
-        let row = pg_client
-            .query_one(query, &[&request_key.to_str(), &response_key.to_str()])
+        let row_opt = pg_client
+            .query_opt(query, &[&request_key.to_str(), &response_key.to_str()])
             .await?;
-        Self::parse_row(row)
+        match row_opt {
+            Some(row) => Ok(Some(Self::parse_row(row)?)),
+            None => Ok(None),
+        }
     }
 
     pub async fn to_pending(&self, pg_client: &PgClient) -> Result<(), Error> {
@@ -147,14 +155,19 @@ impl TdManager {
         Self { client_id }
     }
 
-    pub async fn send_request(&self, pg_client: &PgClient) -> Result<(), Error> {
-        let task = Task::first_waiting(pg_client).await?;
-        // error!("task -> {:?}", task);
-        update_last_request(task.request);
-        task.to_pending(pg_client).await?;
-        // tokio::time::sleep(Duration::from_secs(1)).await;
-        send(self.client_id, &task.message);
-        Ok(())
+    pub async fn send_request(&self, pg_client: &PgClient) -> Result<(), BotError> {
+        match Task::first_waiting(pg_client).await? {
+            Some(task) => {
+                update_last_request(task.request)?;
+                task.to_pending(pg_client).await?;
+                send(self.client_id, &task.message);
+                Ok(())
+            }
+            None => {
+                info!("No task found");
+                Ok(())
+            }
+        }
     }
 
     // pub async fn start(client_id: ClientId, pg_client: &PgClient) -> Result<(), Error> {
