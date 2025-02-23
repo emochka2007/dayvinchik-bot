@@ -13,7 +13,6 @@ mod openapi;
 mod pg;
 mod prompts;
 mod start_phrases;
-mod superlike;
 mod td;
 
 use crate::common::{env_init, BotError};

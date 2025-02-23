@@ -2557,6 +2557,7 @@ dependencies = [
  "postgres",
  "project-root",
  "qrcode",
+ "rand 0.9.0",
  "reqwest",
  "rust-tdlib",
  "serde",

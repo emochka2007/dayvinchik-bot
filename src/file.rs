@@ -12,12 +12,10 @@ use tokio::time::sleep;
 
 pub fn get_project_root() -> io::Result<PathBuf> {
     let path = env::current_dir()?;
-    let mut path_ancestors = path.as_path().ancestors();
+    let path_ancestors = path.as_path().ancestors();
 
-    while let Some(p) = path_ancestors.next() {
-        let has_cargo = read_dir(p)?
-            .into_iter()
-            .any(|p| p.unwrap().file_name() == OsString::from("Cargo.lock"));
+    for p in path_ancestors {
+        let has_cargo = read_dir(p)?.any(|p| p.unwrap().file_name() == *"Cargo.lock");
         if has_cargo {
             return Ok(PathBuf::from(p));
         }
@@ -56,9 +54,9 @@ pub fn move_file(src: &str, dest: &str) -> StdResult {
     Ok(())
 }
 pub async fn get_image_with_retries(path_to_img: &str, local_path: &str) -> io::Result<String> {
-    if let Ok(base64_image) = image_to_base64(local_path) {
-        return Ok(base64_image);
-    }
+    // if let Ok(base64_image) = image_to_base64(local_path) {
+    //     return Ok(base64_image);
+    // }
     let base64_image = {
         //todo config
         let max_attempts = 3;
@@ -70,6 +68,8 @@ pub async fn get_image_with_retries(path_to_img: &str, local_path: &str) -> io::
                     break img;
                 }
                 Err(_e) => {
+                    // todo Retries should be removed, as now  we check beforehand
+                    error!("Cannot get the image. retrying {attempts}");
                     attempts += 1;
                     if attempts >= max_attempts {
                         return Err(io::Error::new(

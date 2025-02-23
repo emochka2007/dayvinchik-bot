@@ -1,13 +1,13 @@
 use crate::common::{BotError, ChatId, FileId, MessageId};
 use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_match::ProfileMatch;
-use crate::entities::profile_reviewer::{ProfileReviewer, ProfileReviewerStatus};
+use crate::entities::profile_reviewer::{ProcessingStatus, ProfileReviewer};
 use crate::pg::pg::{DbQuery, PgClient};
 use crate::td::td_file::td_file_download;
 use crate::td::td_manager::Task;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
-use log::{debug, error, info};
+use log::{debug, error};
 use rust_tdlib::types::{
     GetChatHistory, Message, MessageContent, Messages, TextEntity, TextEntityType,
 };
@@ -186,7 +186,7 @@ pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<(), B
                     let mut profile_reviewer = ProfileReviewer::new(
                         message.chat_id(),
                         parsed_message.text(),
-                        ProfileReviewerStatus::Pending,
+                        ProcessingStatus::Pending,
                         parsed_message.local_img_path().to_string(),
                     );
                     profile_reviewer.set_file_ids(file_ids.clone());
@@ -197,6 +197,7 @@ pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<(), B
                 } else {
                     // // todo mb this logic shouldnt be here
                     DvBot::send_dislike(pg_client).await?;
+                    DvBot::refresh(pg_client).await?;
                 }
             }
         }
@@ -221,6 +222,6 @@ pub async fn td_get_last_message(
         ResponseKeys::Messages,
         pg_client,
     )
-        .await?;
+    .await?;
     Ok(())
 }

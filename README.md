@@ -1,9 +1,8 @@
 ## todo:
 
-- todo Fix download file system
-- Dynamic superlike prompt from LLM
-- Superlike generation
 - Auto-responder
+- Smart superlike generation based on prompt from LLM
+- Auto-fail of profile_reviewer, if stuck for two long (couldnt find the image)
 
 ## Altushka Bot
 
@@ -58,6 +57,5 @@
 - interact with db
 - Store the currently reviewing profi to send all photos to gpt to analuze
 - Insert each review inside the db with the status `PENDING`, 'COMPLETED'
-
 - Custom errors
- 
+- Superlikes random choice for now

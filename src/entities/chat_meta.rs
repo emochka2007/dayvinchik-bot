@@ -48,7 +48,7 @@ impl DbQuery for ChatMeta {
         Ok(())
     }
 
-    async fn select_one(pg_client: &PgClient, id: Uuid) -> Result<Self, BotError>
+    async fn select_by_id(pg_client: &PgClient, id: Uuid) -> Result<Self, BotError>
     where
         Self: Sized,
     {
@@ -112,7 +112,7 @@ pub async fn td_chat_info(pg_client: &PgClient, chat_id: ChatId) -> Result<(), B
         ResponseKeys::Chat,
         pg_client,
     )
-    .await?;
+        .await?;
     Ok(())
 }
 //todo mb parser for all json struct
@@ -153,6 +153,6 @@ pub async fn td_open_chat(pg_client: &PgClient, chat_id: ChatId) -> Result<(), E
         ResponseKeys::Ok,
         pg_client,
     )
-    .await?;
+        .await?;
     Ok(())
 }

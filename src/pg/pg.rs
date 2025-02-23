@@ -73,10 +73,8 @@ impl PgConnect {
         cfg.manager = Some(ManagerConfig {
             recycling_method: RecyclingMethod::Fast,
         });
-        let pool = cfg
-            .create_pool(Some(Runtime::Tokio1), NoTls)
-            .expect("Failed to create pool");
-        pool
+        cfg.create_pool(Some(Runtime::Tokio1), NoTls)
+            .expect("Failed to create pool")
     }
 
     pub fn from_env() -> Result<Self, BotError> {
@@ -94,7 +92,7 @@ impl PgConnect {
 
     pub async fn connect_pg_from_env() -> Result<Client, BotError> {
         let pg = Self::from_env()?;
-        Ok(pg.connect().await?)
+        pg.connect().await
     }
     pub fn create_pool_from_env() -> Result<Pool, BotError> {
         let pool = Self::from_env()?;
@@ -116,7 +114,7 @@ impl PgConnect {
 #[async_trait]
 pub trait DbQuery {
     async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<(), BotError>;
-    async fn select_one(pg_client: &PgClient, id: Uuid) -> Result<Self, BotError>
+    async fn select_by_id(pg_client: &PgClient, id: Uuid) -> Result<Self, BotError>
     where
         Self: Sized;
     fn from_sql(row: Row) -> Result<Self, BotError>

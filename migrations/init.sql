@@ -97,9 +97,7 @@ Create table if not exists superlikes
 (
     id                  uuid primary key                     default uuid_generate_v4(),
     message             text                        not null,
-    -- WAITING, COMPLETE
     profile_reviewer_id uuid references profile_reviewers,
-    status              text                                 DEFAULT 'WAITING',
     created_at          TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
     updated_at          TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp
 )

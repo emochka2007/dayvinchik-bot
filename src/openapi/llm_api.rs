@@ -1,8 +1,8 @@
 use crate::common::BotError;
-use crate::file::image_to_base64;
+use crate::file::{image_to_base64, log_append};
 use crate::openapi::openai::ChatCompletionResponse;
 use crate::prompts::Prompt;
-use log::info;
+use log::{debug, error, info};
 use reqwest::Client;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
@@ -38,7 +38,7 @@ impl OpenAI {
     }
 
     fn parse_choice(chat_completion_response: &ChatCompletionResponse) -> Result<String, BotError> {
-        match chat_completion_response.choices.get(0) {
+        match chat_completion_response.choices.first() {
             Some(choice) => Ok(choice.message.content.to_string()),
             None => Err(io::Error::new(ErrorKind::InvalidData, "Choice not found").into()),
         }
@@ -118,7 +118,6 @@ impl OpenAI {
             ]
         });
         let response = self.post::<ChatCompletionResponse>(body).await?;
-        info!("OpenAI response {:?}", response);
         Self::parse_choice(&response)
     }
 }

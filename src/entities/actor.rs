@@ -1,6 +1,7 @@
 use crate::common::BotError;
 use crate::entities::dv_bot::DvBot;
-use crate::entities::profile_reviewer::{ProfileReviewer, ProfileReviewerStatus};
+use crate::entities::profile_reviewer::{ProcessingStatus, ProfileReviewer};
+use crate::entities::superlike::SuperLike;
 use crate::pg::pg::{DbStatusQuery, PgClient};
 use crate::prompts::Prompt;
 use log::{error, info};
@@ -52,12 +53,12 @@ impl Actor {
             {
                 if let Some(score) = completed_reviewer.score() {
                     if *score >= self.score_threshold {
-                        DvBot::send_like(pg_client).await?;
+                        DvBot::send_superlike(pg_client, completed_reviewer.id()).await?;
                     } else {
                         DvBot::send_dislike(pg_client).await?;
                     }
                     completed_reviewer
-                        .update_status(pg_client, ProfileReviewerStatus::Processed)
+                        .update_status(pg_client, ProcessingStatus::Processed)
                         .await?;
                     DvBot::read_last_message(pg_client).await?;
                 } else {

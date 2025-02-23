@@ -3,6 +3,7 @@ use rust_tdlib::tdjson::set_log_verbosity_level;
 use std::backtrace::Backtrace;
 use std::env::VarError;
 use std::num::ParseIntError;
+use rand::Rng;
 use thiserror::Error;
 
 pub type ChatId = i64;
@@ -71,4 +72,9 @@ pub fn env_init() {
     dotenvy::dotenv().unwrap_or_else(|_e| {
         panic!("Not enable to initialize dotenvy");
     });
+}
+
+pub fn random_number(from: i64, to: i64) -> i64 {
+    let mut rng = rand::rng();
+    rng.random_range(from..to)
 }

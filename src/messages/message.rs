@@ -53,9 +53,9 @@ impl SendMessage {
         };
         message
     }
-    //todo mb rename
+    
     pub fn super_like(chat_id: &str) -> Self {
-        let message = SendMessage {
+        SendMessage {
             t: "sendMessage".to_string(),
             chat_id: chat_id.to_string(),
             input_message_content: InputMessageContent {
@@ -65,9 +65,9 @@ impl SendMessage {
                     text: "💌 / 📹".to_string(),
                 },
             },
-        };
-        message
+        }
     }
+
     pub fn text_message(text: &str, chat_id: &str) -> Self {
         let message = SendMessage {
             t: "sendMessage".to_string(),

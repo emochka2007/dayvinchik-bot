@@ -1,9 +1,11 @@
 use crate::common::BotError;
 use crate::entities::dv_bot::DvBot;
 use crate::file::{file_exists, get_image_with_retries, move_file};
+use crate::main;
 use crate::openapi::llm_api::OpenAI;
 use crate::pg::pg::{DbQuery, DbStatusQuery, PgClient};
 use crate::prompts::Prompt;
+use crate::td::td_file::td_file_download;
 use async_trait::async_trait;
 use log::{debug, error};
 use std::error::Error;
@@ -12,18 +14,17 @@ use std::io::ErrorKind;
 use tokio_postgres::types::{FromSql, Type};
 use tokio_postgres::Row;
 use uuid::Uuid;
-use crate::main;
-use crate::td::td_file::td_file_download;
 
 #[derive(Debug)]
-pub enum ProfileReviewerStatus {
+pub enum ProcessingStatus {
     Waiting,
     Pending,
     Complete,
     Failed,
     Processed,
 }
-impl ProfileReviewerStatus {
+//todo from str
+impl ProcessingStatus {
     pub fn to_str(&self) -> Result<&str, BotError> {
         match self {
             Self::Waiting => Ok("WAITING"),
@@ -31,33 +32,18 @@ impl ProfileReviewerStatus {
             Self::Complete => Ok("COMPLETE"),
             Self::Failed => Ok("FAILED"),
             Self::Processed => Ok("PROCESSED"),
-            // _ => Err(BotError::from(io::Error::new(
-            //     ErrorKind::NotFound,
-            //     "ProfileReviewerStatus not found",
-            // ))),
         }
     }
-    // pub fn from_str(data: &str) -> io::Result<Self> {
-    //     match data {
-    //         "getChatHistory" => Ok(RequestKeys::GetChatHistory),
-    //         "downloadFile" => Ok(RequestKeys::DownloadFile),
-    //         "getChat" => Ok(RequestKeys::GetChat),
-    //         "searchPublicChat" => Ok(RequestKeys::SearchPublicChat),
-    //         "sendMessage" => Ok(RequestKeys::SendMessage),
-    //         "openChat" => Ok(RequestKeys::OpenChat),
-    //         _ => Ok(RequestKeys::Unknown),
-    //     }
-    // }
 }
-impl FromSql<'_> for ProfileReviewerStatus {
+impl FromSql<'_> for ProcessingStatus {
     fn from_sql(ty: &Type, raw: &[u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
         let string_from_db = String::from_utf8(raw.to_vec()).expect("Invalid UTF-8");
         match string_from_db.as_str() {
-            "WAITING" => Ok(ProfileReviewerStatus::Waiting),
-            "PENDING" => Ok(ProfileReviewerStatus::Pending),
-            "COMPLETE" => Ok(ProfileReviewerStatus::Complete),
-            "FAILED" => Ok(ProfileReviewerStatus::Failed),
-            "PROCESSED" => Ok(ProfileReviewerStatus::Processed),
+            "WAITING" => Ok(ProcessingStatus::Waiting),
+            "PENDING" => Ok(ProcessingStatus::Pending),
+            "COMPLETE" => Ok(ProcessingStatus::Complete),
+            "FAILED" => Ok(ProcessingStatus::Failed),
+            "PROCESSED" => Ok(ProcessingStatus::Processed),
             _ => Err(Box::new(io::Error::new(
                 ErrorKind::NotFound,
                 "Profile Reviewer status not found",
@@ -78,7 +64,7 @@ pub struct ProfileReviewer {
     chat_id: i64,
     score: Option<i32>,
     text: String,
-    status: ProfileReviewerStatus,
+    status: ProcessingStatus,
     local_img_path: String,
     file_ids: Option<Vec<i32>>,
 }
@@ -109,7 +95,7 @@ impl DbQuery for ProfileReviewer {
         Ok(())
     }
 
-    async fn select_one(pg_client: &PgClient, id: Uuid) -> Result<Self, BotError>
+    async fn select_by_id(pg_client: &PgClient, id: Uuid) -> Result<Self, BotError>
     where
         Self: Sized,
     {
@@ -136,7 +122,7 @@ impl DbQuery for ProfileReviewer {
 
 #[async_trait]
 impl DbStatusQuery for ProfileReviewer {
-    type Status = ProfileReviewerStatus;
+    type Status = ProcessingStatus;
 
     async fn update_status<'a>(
         &'a self,
@@ -164,7 +150,12 @@ impl DbStatusQuery for ProfileReviewer {
 }
 // todo implement diff struct ProfileReviewerDb
 impl ProfileReviewer {
-    pub fn new(chat_id: i64, text: &String, status: ProfileReviewerStatus, local_img_path: String) -> Self {
+    pub fn new(
+        chat_id: i64,
+        text: &String,
+        status: ProcessingStatus,
+        local_img_path: String,
+    ) -> Self {
         Self {
             id: Uuid::new_v4(),
             chat_id,
@@ -178,7 +169,7 @@ impl ProfileReviewer {
     pub fn score(&self) -> &Option<i32> {
         &self.score
     }
-    pub fn _status(&self) -> &ProfileReviewerStatus {
+    pub fn _status(&self) -> &ProcessingStatus {
         &self.status
     }
     pub fn local_img_path(&self) -> &str {
@@ -208,8 +199,8 @@ impl ProfileReviewer {
             .query_opt(
                 query,
                 &[
-                    &ProfileReviewerStatus::Processed.to_str()?,
-                    &ProfileReviewerStatus::Failed.to_str()?,
+                    &ProcessingStatus::Processed.to_str()?,
+                    &ProcessingStatus::Failed.to_str()?,
                 ],
             )
             .await?;
@@ -227,15 +218,15 @@ impl ProfileReviewer {
             .query_opt(
                 query,
                 &[
-                    &ProfileReviewerStatus::Pending.to_str()?,
-                    &ProfileReviewerStatus::Complete.to_str()?,
+                    &ProcessingStatus::Pending.to_str()?,
+                    &ProcessingStatus::Complete.to_str()?,
                 ],
             )
             .await?;
         if rows.is_some() {
             return Ok(None);
         }
-        Self::get_by_status_one(client, ProfileReviewerStatus::Waiting).await
+        Self::get_by_status_one(client, ProcessingStatus::Waiting).await
     }
 
     pub async fn finalize(&self, client: &PgClient, score: i32) -> Result<(), BotError> {
@@ -246,7 +237,7 @@ impl ProfileReviewer {
         client
             .query(
                 query,
-                &[&ProfileReviewerStatus::Complete.to_str()?, &score, &self.id],
+                &[&ProcessingStatus::Complete.to_str()?, &score, &self.id],
             )
             .await?;
         Ok(())
@@ -256,18 +247,8 @@ impl ProfileReviewer {
     /// If there's no WAITING profile_reviewer -> return None
     /// Returns profile_reviewer in COMPLETE status
     pub async fn get_ready_to_proceed(client: &PgClient) -> Result<Option<Self>, BotError> {
-        // let pending_reviewer =
-        //     Self::get_by_status_one(client, ProfileReviewerStatus::Pending).await?;
-        // if pending_reviewer.is_some() {
-        //     return Ok(None);
-        // }
-        // let waiting_reviewer =
-        //     Self::get_by_status_one(client, ProfileReviewerStatus::Waiting).await?;
-        // if waiting_reviewer.is_none() {
-        //     return Ok(None);
-        // }
         let completed_reviewer =
-            Self::get_by_status_one(client, ProfileReviewerStatus::Complete).await?;
+            Self::get_by_status_one(client, ProcessingStatus::Complete).await?;
         Ok(completed_reviewer)
     }
 
@@ -276,13 +257,14 @@ impl ProfileReviewer {
         pg_client: &PgClient,
     ) -> Result<(), BotError> {
         profile_reviewer
-            .update_status(pg_client, ProfileReviewerStatus::Pending)
+            .update_status(pg_client, ProcessingStatus::Pending)
             .await?;
         let open_ai = OpenAI::new()?;
         let prompt = Prompt::analyze_alt();
         let file_id = profile_reviewer.main_file().unwrap();
         let main_file = format!("profile_images/{file_id}.png");
-        let base64_image = get_image_with_retries(&main_file, &profile_reviewer.local_img_path).await?;
+        let base64_image =
+            get_image_with_retries(&main_file, &profile_reviewer.local_img_path).await?;
         let response = open_ai
             .send_sys_image_message(prompt.system.unwrap(), prompt.user, base64_image)
             .await?;
@@ -305,7 +287,7 @@ impl ProfileReviewer {
                         Err(e) => {
                             // If profile_reviewer failed, then we send dislike and set to failed
                             profile_reviewer
-                                .update_status(pg_client, ProfileReviewerStatus::Failed)
+                                .update_status(pg_client, ProcessingStatus::Failed)
                                 .await?;
                             Err(e)
                         }
