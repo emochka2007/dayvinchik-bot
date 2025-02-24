@@ -1,6 +1,7 @@
 ## todo:
 
 - Auto-responder
+- On start finish all profile_reviewers and clean up tasks
 - Smart superlike generation based on prompt from LLM
 - Auto-fail of profile_reviewer, if stuck for two long (couldnt find the image)
 

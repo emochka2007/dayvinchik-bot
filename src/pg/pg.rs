@@ -1,4 +1,6 @@
 use crate::common::BotError;
+use crate::entities::profile_reviewer::ProfileReviewer;
+use crate::entities::task::Task;
 use async_trait::async_trait;
 use deadpool_postgres::{Config, Manager, ManagerConfig, Pool, RecyclingMethod, Runtime};
 use log::info;
@@ -109,17 +111,38 @@ impl PgConnect {
         }
         Ok(())
     }
+    pub async fn clean_db(pg_client: &PgClient) -> Result<(), BotError> {
+        ProfileReviewer::clean_up(pg_client).await?;
+        Task::clean_up(pg_client).await?;
+        Ok(())
+    }
 }
 
 #[async_trait]
 pub trait DbQuery {
+    const DB_NAME: &'static str = "";
     async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<(), BotError>;
-    async fn select_by_id(pg_client: &PgClient, id: Uuid) -> Result<Self, BotError>
+    async fn select_by_id(pg_client: &PgClient, id: Uuid) -> Result<Option<Self>, BotError>
     where
-        Self: Sized;
+        Self: Sized,
+    {
+        let query = format!(
+            "SELECT * from {} WHERE id = $1 ORDER BY created_at LIMIT 1",
+            Self::DB_NAME
+        );
+        let row_opt = pg_client.query_opt(&query, &[&id]).await?;
+        match row_opt {
+            Some(row) => Ok(Some(Self::from_sql(row)?)),
+            None => Ok(None),
+        }
+    }
     fn from_sql(row: Row) -> Result<Self, BotError>
     where
         Self: Sized;
+    // optional
+    async fn clean_up(_pg_client: &PgClient) -> Result<(), BotError> {
+        unimplemented!();
+    }
 }
 #[async_trait]
 pub trait DbStatusQuery {

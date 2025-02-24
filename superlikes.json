@@ -1,5 +1,10 @@
 {
-    "nyash": "няшка",
-    "cute": "ты очень милая",
-    "photo_action_like": "фотка классная"
+  "@extra": "cc6b204c-ab20-4c9e-90d9-24582fbd540a",
+  "@client_id": null,
+  "chat_id": 1234060895,
+  "from_message_id": 0,
+  "offset": 0,
+  "limit": 1,
+  "only_local": false,
+  "@type": "getChatHistory"
 }

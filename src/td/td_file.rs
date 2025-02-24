@@ -1,6 +1,6 @@
 use crate::common::BotError;
+use crate::entities::task::Task;
 use crate::pg::pg::PgClient;
-use crate::td::td_manager::Task;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
 use rust_tdlib::types::DownloadFile;

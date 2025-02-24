@@ -1,7 +1,6 @@
 use crate::common::BotError;
-use crate::entities::dv_bot::DvBot;
+use crate::entities::task::Task;
 use crate::file::{file_exists, get_image_with_retries, move_file};
-use crate::main;
 use crate::openapi::llm_api::OpenAI;
 use crate::pg::pg::{DbQuery, DbStatusQuery, PgClient};
 use crate::prompts::Prompt;
@@ -11,6 +10,7 @@ use log::{debug, error};
 use std::error::Error;
 use std::io;
 use std::io::ErrorKind;
+use std::time::{Duration, SystemTime};
 use tokio_postgres::types::{FromSql, Type};
 use tokio_postgres::Row;
 use uuid::Uuid;
@@ -67,10 +67,12 @@ pub struct ProfileReviewer {
     status: ProcessingStatus,
     local_img_path: String,
     file_ids: Option<Vec<i32>>,
+    updated_at: SystemTime,
 }
 
 #[async_trait]
 impl DbQuery for ProfileReviewer {
+    const DB_NAME: &'static str = "profile_reviewers";
     async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<(), BotError> {
         let query = "INSERT into profile_reviewers (\
         chat_id, \
@@ -95,15 +97,6 @@ impl DbQuery for ProfileReviewer {
         Ok(())
     }
 
-    async fn select_by_id(pg_client: &PgClient, id: Uuid) -> Result<Self, BotError>
-    where
-        Self: Sized,
-    {
-        let query = "SELECT * from profile_reviewers id = $1";
-        let row = pg_client.query_one(query, &[&id]).await?;
-        Ok(Self::from_sql(row)?)
-    }
-
     fn from_sql(row: Row) -> Result<Self, BotError>
     where
         Self: Sized,
@@ -116,7 +109,15 @@ impl DbQuery for ProfileReviewer {
             status: row.try_get("status")?,
             file_ids: Some(row.try_get("file_ids")?),
             local_img_path: row.try_get("local_img_path")?,
+            updated_at: row.try_get("updated_at")?,
         })
+    }
+    async fn clean_up(pg_client: &PgClient) -> Result<(), BotError> {
+        let query = "UPDATE profile_reviewers SET status = $1";
+        pg_client
+            .query(query, &[&ProcessingStatus::Processed.to_str()?])
+            .await?;
+        Ok(())
     }
 }
 
@@ -164,6 +165,7 @@ impl ProfileReviewer {
             score: None,
             file_ids: None,
             local_img_path,
+            updated_at: SystemTime::now(),
         }
     }
     pub fn score(&self) -> &Option<i32> {
@@ -268,6 +270,7 @@ impl ProfileReviewer {
         let response = open_ai
             .send_sys_image_message(prompt.system.unwrap(), prompt.user, base64_image)
             .await?;
+        error!("Response {response}");
         let score = response.parse::<i32>()?;
         profile_reviewer.finalize(pg_client, score).await?;
         let reviewed_file = format!("reviewed_images/{}.png", profile_reviewer.id());
@@ -293,12 +296,32 @@ impl ProfileReviewer {
                         }
                     }
                 } else {
-                    error!("PV start -> File doesnt exist {main_file}");
+                    debug!("PV start -> File doesnt exist {main_file}");
                     td_file_download(pg_client, file_id).await?;
                     Ok(())
                 }
             }
             None => Ok(()),
+        }
+    }
+    pub async fn is_reviewer_stuck(pg_client: &PgClient) -> Result<bool, BotError> {
+        let query = "SELECT * FROM profile_reviewers ORDER BY updated_at DESC LIMIT 1";
+        let row_opt = pg_client.query_opt(query, &[]).await?;
+        match row_opt {
+            Some(row) => {
+                if Task::find_start(pg_client).await?.is_some() {
+                    let updated_at: SystemTime = row.try_get("updated_at")?;
+                    let now = SystemTime::now();
+                    let time_passed = now.duration_since(updated_at).unwrap();
+                    return Ok(time_passed > Duration::from_secs(120));
+                }
+                Ok(false)
+            }
+            None => Err(io::Error::new(
+                ErrorKind::NotFound,
+                "Is reviewer stuck error, not found the row",
+            )
+            .into()),
         }
     }
 }

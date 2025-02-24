@@ -1,6 +1,6 @@
 use crate::common::{BotError, ChatId, MessageId};
+use crate::entities::task::Task;
 use crate::pg::pg::{DbQuery, PgClient};
-use crate::td::td_manager::Task;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
 use async_trait::async_trait;
@@ -23,6 +23,7 @@ pub struct ChatMeta {
 
 #[async_trait]
 impl DbQuery for ChatMeta {
+    const DB_NAME: &'static str = "chats";
     async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<(), BotError> {
         let query = "INSERT INTO chats (\
         id, \
@@ -46,15 +47,6 @@ impl DbQuery for ChatMeta {
             )
             .await?;
         Ok(())
-    }
-
-    async fn select_by_id(pg_client: &PgClient, id: Uuid) -> Result<Self, BotError>
-    where
-        Self: Sized,
-    {
-        let query = "SELECT * from chats WHERE id = $1 LIMIT 1";
-        let row = pg_client.query_one(query, &[&id]).await?;
-        Self::from_sql(row)
     }
 
     fn from_sql(row: Row) -> Result<Self, BotError>
@@ -112,7 +104,7 @@ pub async fn td_chat_info(pg_client: &PgClient, chat_id: ChatId) -> Result<(), B
         ResponseKeys::Chat,
         pg_client,
     )
-        .await?;
+    .await?;
     Ok(())
 }
 //todo mb parser for all json struct
@@ -144,15 +136,15 @@ pub async fn get_chat(json_str: Value, pg_client: &PgClient) -> Result<Option<Ch
     }
 }
 
-pub async fn td_open_chat(pg_client: &PgClient, chat_id: ChatId) -> Result<(), Error> {
+pub async fn td_open_chat(pg_client: &PgClient, chat_id: ChatId) -> Result<(), BotError> {
     let message = OpenChat::builder().chat_id(chat_id).build();
-    let chat_history_msg = serde_json::to_string(&message).unwrap();
+    let chat_history_msg = serde_json::to_string(&message)?;
     Task::new(
         chat_history_msg,
         RequestKeys::OpenChat,
         ResponseKeys::Ok,
         pg_client,
     )
-        .await?;
+    .await?;
     Ok(())
 }

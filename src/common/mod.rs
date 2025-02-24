@@ -1,9 +1,9 @@
 use deadpool_postgres::PoolError;
+use rand::Rng;
 use rust_tdlib::tdjson::set_log_verbosity_level;
 use std::backtrace::Backtrace;
 use std::env::VarError;
 use std::num::ParseIntError;
-use rand::Rng;
 use thiserror::Error;
 
 pub type ChatId = i64;

@@ -1,7 +1,7 @@
 use crate::common::StdResult;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
-use log::error;
+use log::{debug, error};
 use std::ffi::OsString;
 use std::fs::{read_dir, File, OpenOptions};
 use std::io::{Read, Write};
@@ -49,7 +49,7 @@ pub fn read_json_file(path: &str) -> io::Result<String> {
 }
 pub fn move_file(src: &str, dest: &str) -> StdResult {
     fs::rename(src, dest).unwrap_or_else(|_err| {
-        error!("Failed to move file: {}", _err);
+        debug!("Failed to move file: {}", _err);
     });
     Ok(())
 }

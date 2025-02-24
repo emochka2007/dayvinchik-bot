@@ -53,7 +53,7 @@ impl SendMessage {
         };
         message
     }
-    
+
     pub fn super_like(chat_id: &str) -> Self {
         SendMessage {
             t: "sendMessage".to_string(),

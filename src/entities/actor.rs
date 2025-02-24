@@ -15,8 +15,8 @@ use uuid::Uuid;
 - Actor identifies the behaviour of your chat
 **/
 pub enum ActorType {
-    DEFAULT,
-    ANALYZER,
+    Default,
+    Analyzer,
 }
 pub struct Actor {
     id: Uuid,
@@ -35,7 +35,7 @@ impl Actor {
 
     pub fn prompt(&self) -> Prompt {
         match self.actor_type {
-            ActorType::ANALYZER => Prompt::analyze_alt(),
+            ActorType::Analyzer => Prompt::analyze_alt(),
             _ => Prompt::analyze_alt(),
         }
     }
@@ -43,11 +43,19 @@ impl Actor {
     /// First we update the chat and only after update latest messages for dv bot
     pub async fn analyze(&self, pg_client: &PgClient) -> Result<(), BotError> {
         info!("Analyzing...");
-        //break statement mb
         DvBot::refresh(pg_client).await?;
         DvBot::read_last_message(pg_client).await?;
+        //break statement mb
         loop {
-            sleep(Duration::from_secs(5)).await;
+            sleep(Duration::from_secs(10)).await;
+            // If reviewer is stuck for more than 1 minute, we run refresh
+            let is_stuck = ProfileReviewer::is_reviewer_stuck(pg_client).await?;
+            if is_stuck {
+                error!("reviewer is stuck fixing");
+                DvBot::refresh(pg_client).await?;
+                DvBot::read_last_message(pg_client).await?;
+            }
+
             if let Some(completed_reviewer) =
                 ProfileReviewer::get_ready_to_proceed(pg_client).await?
             {

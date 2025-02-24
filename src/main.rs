@@ -42,17 +42,18 @@ async fn main() -> Result<(), BotError> {
 
     let client = pool.get().await?;
     PgConnect::run_migrations(&client).await?;
+    PgConnect::clean_db(&client).await?;
 
     tokio::spawn(async move {
         loop {
             let msg = tokio::task::spawn_blocking(|| {
                 receive(0.1) // td_receive
             })
-                .await
-                .unwrap_or_else(|e| {
-                    error!("{:?}", e);
-                    panic!("Tokio task spawn blocking");
-                });
+            .await
+            .unwrap_or_else(|e| {
+                error!("{:?}", e);
+                panic!("Tokio task spawn blocking");
+            });
 
             if let Some(x) = msg {
                 // info!("X -> {x}");
@@ -90,7 +91,7 @@ async fn main() -> Result<(), BotError> {
                 debug!("UPDATE_CHAT var is not set {:?}", e);
             }
         }
-        Actor::new(ActorType::DEFAULT, 50)
+        Actor::new(ActorType::Default, 50)
             .analyze(&client)
             .await
             .unwrap_or_else(|e| {
@@ -110,7 +111,8 @@ async fn main() -> Result<(), BotError> {
     });
 
     let mode = env::var("MODE")?;
-    if mode == "CRON" {} else {
+    if mode == "CRON" {
+    } else {
         loop {
             if let Ok(input) = input() {
                 if let Ok(client) = pool.get().await {

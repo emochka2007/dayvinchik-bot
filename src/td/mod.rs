@@ -9,7 +9,6 @@ pub mod td_chats;
 pub mod td_command_map;
 pub mod td_file;
 pub mod td_json;
-pub mod td_manager;
 pub mod td_message;
 pub mod td_request;
 pub mod td_response;

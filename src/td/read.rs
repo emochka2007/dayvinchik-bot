@@ -1,9 +1,9 @@
 use crate::common::BotError;
 use crate::constants::get_last_request;
 use crate::entities::chat_meta::{get_chat, td_chat_info};
+use crate::entities::task::{Task, TaskStatus};
 use crate::file::move_file;
-use crate::pg::pg::PgClient;
-use crate::td::td_manager::Task;
+use crate::pg::pg::{DbStatusQuery, PgClient};
 use crate::td::td_message::chat_history;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
@@ -40,7 +40,7 @@ pub async fn parse_message(json_str: &str, pg_client: &PgClient) -> Result<(), B
     debug!("Last tdlib call: {:?}", last_tdlib_call);
 
     // Attempt to find a “pending” Task that matches the last request + response
-    let task = Task::first_pending(pg_client, &last_tdlib_call, &response_key).await?;
+    let task = Task::match_by_req_res(pg_client, &last_tdlib_call, &response_key).await?;
 
     // No task is waiting
     if task.is_none() {
@@ -49,7 +49,7 @@ pub async fn parse_message(json_str: &str, pg_client: &PgClient) -> Result<(), B
     //todo mb fix
     let task = task.unwrap();
     if *task.request() == last_tdlib_call && *task.response() == response_key {
-        task.to_complete(pg_client).await?;
+        task.update_status(pg_client, TaskStatus::Complete).await?;
     } else {
         // Skip all non-matched webhooks
         return Ok(());

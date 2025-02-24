@@ -2,9 +2,9 @@ use crate::common::{BotError, ChatId, FileId, MessageId};
 use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_match::ProfileMatch;
 use crate::entities::profile_reviewer::{ProcessingStatus, ProfileReviewer};
+use crate::entities::task::Task;
 use crate::pg::pg::{DbQuery, PgClient};
 use crate::td::td_file::td_file_download;
-use crate::td::td_manager::Task;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
 use log::{debug, error};
@@ -79,7 +79,7 @@ impl MessageMeta {
     pub fn file_ids(&self) -> &Option<Vec<i32>> {
         &self.file_ids
     }
-    pub async fn insert_db(&self, client: &PgClient) -> Result<(), Error> {
+    pub async fn insert_db(&self, client: &PgClient) -> Result<(), BotError> {
         let id = &Uuid::parse_str(&self.id).unwrap();
         let query = "INSERT INTO messages (\
         id, \

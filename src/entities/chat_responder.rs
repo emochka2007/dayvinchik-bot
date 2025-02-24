@@ -15,6 +15,7 @@ pub struct ChatResponder {
 
 #[async_trait]
 impl DbQuery for ChatResponder {
+    const DB_NAME: &'static str = "chat_responders";
     async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<(), BotError> {
         let query = "INSERT into chat_responders (\
         id,
@@ -27,23 +28,13 @@ impl DbQuery for ChatResponder {
                 query,
                 &[
                     &self.id,
-                    //todo fix convert to str
-                    &"WAITING",
+                    &ProcessingStatus::Waiting.to_str()?,
                     &self.chat_id,
                     &self.from,
                 ],
             )
             .await?;
         Ok(())
-    }
-
-    async fn select_by_id(pg_client: &PgClient, id: Uuid) -> Result<Self, BotError>
-    where
-        Self: Sized,
-    {
-        let query = "SELECT * from chat_responders id = $1";
-        let row = pg_client.query_one(query, &[&id]).await?;
-        Ok(Self::from_sql(row)?)
     }
 
     fn from_sql(row: Row) -> Result<Self, BotError>
@@ -98,5 +89,5 @@ impl ChatResponder {
             to: None,
         }
     }
-    pub fn update_to(&self, to: &str) -> Result<(), BotError> {}
+    // pub fn update_to(&self, to: &str) -> Result<(), BotError> {}
 }
