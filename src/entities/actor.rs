@@ -42,12 +42,14 @@ impl Actor {
 
     /// First we update the chat and only after update latest messages for dv bot
     pub async fn analyze(&self, pg_client: &PgClient) -> Result<(), BotError> {
-        info!("Analyzing...");
+        fix  Actor analyze error Postgres { source: Error { kind: RowCount, cause: None }, backtrace: <disabled> }
+
+        error!("Analyzing...");
         DvBot::refresh(pg_client).await?;
         DvBot::read_last_message(pg_client).await?;
         //break statement mb
         loop {
-            sleep(Duration::from_secs(10)).await;
+            sleep(Duration::from_secs(5)).await;
             // If reviewer is stuck for more than 1 minute, we run refresh
             let is_stuck = ProfileReviewer::is_reviewer_stuck(pg_client).await?;
             if is_stuck {

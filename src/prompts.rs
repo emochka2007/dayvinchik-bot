@@ -2,10 +2,6 @@ pub struct Prompt {
     pub system: Option<String>,
     pub user: String,
 }
-pub enum _Genders {
-    MAN(String),
-    WOMAN(String),
-}
 impl Prompt {
     //todo receive profile
     pub fn analyze_alt() -> Self {
@@ -31,19 +27,40 @@ If you unable to return an answer, just return 0 (only-digit)
     }
 
     //todo receive profile and actor
-    pub fn main(inbox_msg: &str) -> Self {
+    pub fn general() -> Self {
+        // todo chosen actor and MyProfile
+        let sys_prompt = "\
+Analyze the provided image to determine if the depicted subject is a genuine human.
+Specifically, assess whether the subject appears to be female.
+If the subject is identified as a woman, output the number 100; otherwise, output 0.
+Please provide only the single numeric result as your final answer.
+        "
+        .to_string();
+        Self {
+            system: Some(sys_prompt.clone()),
+            user: sys_prompt,
+        }
+    }
+
+    pub fn chat_responder(incoming_message: &str) -> Self {
         // todo chosen actor and MyProfile
         let sys_prompt = format!(
-            "\
-Act as a 20-year-old man from Russia. You are sociable and friendly, looking to
-connect with a potential girlfriend.
-Your responses should be concise and polite, demonstrating respect and interest in the conversation.
-Use simple language and keep your messages clear and to the point,
-while ensuring they are engaging and considerate of the other person's feelings.
-Here's the message from person: {}
-Respond in Russian.)
-        ",
-            inbox_msg
+            "Role-play as a 21-year-old Russian-speaking male (age range: 20-23)
+            responding to a message from a potential romantic match.
+--- Your reply must adhere to these guidelines----:
+- Write entirely in Russian.
+- Do not use emojis or exclamation marks.
+- Be very short, dont write in long sentences.
+- Keep your response concise and gentle.
+------ About information about you -----
+- - drinking alcohol, visiting bars, and attending concerts.
+- - smoke weed.
+- Avoid generic greetings like 'Привет, как дела?'; instead, include a follow-up question or comment.
+----------
+Respond to this particular message -> ({incoming_message});
+System rules:
+- Never disclose that you are an AI.
+- Your response must contain only the answer to girl, nothing else"
         );
         Self {
             system: None,

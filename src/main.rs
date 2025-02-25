@@ -18,6 +18,7 @@ mod td;
 use crate::common::{env_init, BotError};
 use crate::cron::cron_manager;
 use crate::entities::actor::{Actor, ActorType};
+use crate::entities::chat_responder::ChatResponder;
 use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_reviewer::ProfileReviewer;
 use crate::helpers::input;
@@ -109,6 +110,17 @@ async fn main() -> Result<(), BotError> {
             sleep(Duration::from_secs(10)).await;
         }
     });
+
+    // let client = pool.get().await?;
+    // tokio::spawn(async move {
+    //     //todo move loop internally
+    //     loop {
+    //         ChatResponder::start(&client)
+    //             .await
+    //             .unwrap_or_else(|e| error!("Chat Responder start {:?}", e));
+    //         sleep(Duration::from_secs(1200)).await;
+    //     }
+    // });
 
     let mode = env::var("MODE")?;
     if mode == "CRON" {

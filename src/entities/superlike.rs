@@ -65,8 +65,15 @@ impl SuperLike {
             "я тебя в тт видел",
             "как ты?",
             "ахаххахахаахха",
+            "го на концерт",
         ];
         let index = random_number(0, messages.len() as i64);
         messages.get(index as usize).unwrap().to_string()
+    }
+
+    pub fn is_superlike_notification(message_text: &str) -> bool {
+        //todo mb improve str
+        let string_to_contain = "Ты понравился";
+        message_text.contains(string_to_contain)
     }
 }

@@ -1,6 +1,8 @@
 use crate::common::{BotError, ChatId, MessageId};
 use crate::entities::task::Task;
 use crate::pg::pg::{DbQuery, PgClient};
+use crate::td::td_json::ClientId;
+use crate::td::td_message::{match_message_content, MessageMeta};
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
 use async_trait::async_trait;
@@ -9,6 +11,7 @@ use rust_tdlib::types::{Chat, GetChat as TdGetChat, OpenChat};
 use serde_json::Value;
 use std::io;
 use std::io::ErrorKind;
+use tokio_postgres::types::IsNull::No;
 use tokio_postgres::{Error, Row};
 use uuid::Uuid;
 
@@ -19,6 +22,7 @@ pub struct ChatMeta {
     last_read_message_id: MessageId,
     title: String,
     last_message_id: MessageId,
+    last_message_text: String,
 }
 
 #[async_trait]
@@ -30,8 +34,9 @@ impl DbQuery for ChatMeta {
         chat_id, \
         last_read_message_id,\
         last_message_id,\
+        last_message_text,\
         title) \
-        VALUES ($1,$2, $3, $4,$5) ON CONFLICT (chat_id) \
+        VALUES ($1,$2, $3, $4,$5, $6) ON CONFLICT (chat_id) \
         DO UPDATE SET last_read_message_id = EXCLUDED.last_read_message_id, \
         last_message_id = EXCLUDED.last_message_id ";
         pg_client
@@ -42,6 +47,7 @@ impl DbQuery for ChatMeta {
                     &self.chat_id,
                     &self.last_read_message_id,
                     &self.last_message_id,
+                    &self.last_message_text,
                     &self.title,
                 ],
             )
@@ -57,6 +63,7 @@ impl DbQuery for ChatMeta {
             id: row.try_get("id")?,
             title: row.try_get("title")?,
             last_read_message_id: row.try_get("last_read_message_id")?,
+            last_message_text: row.try_get("last_message_text")?,
             chat_id: row.try_get("chat_id")?,
             last_message_id: row.try_get("last_message_id")?,
         })
@@ -73,12 +80,16 @@ impl ChatMeta {
     pub fn last_message_id(&self) -> &MessageId {
         &self.last_message_id
     }
+    pub fn last_message_text(&self) -> &String {
+        &self.last_message_text
+    }
 
     pub fn new(
         chat_id: ChatId,
         last_read_message_id: MessageId,
         last_message_id: MessageId,
         title: String,
+        last_message_text: String,
     ) -> Self {
         Self {
             id: Uuid::new_v4(),
@@ -86,12 +97,31 @@ impl ChatMeta {
             title,
             last_read_message_id,
             last_message_id,
+            last_message_text,
         }
     }
-    pub async fn select_by_chat_id(chat_id: i64, client: &PgClient) -> Result<Self, BotError> {
+    /// Don't mix up with the trait which looks by UUID
+    /// todo query_opt
+    pub async fn select_by_chat_id(
+        chat_id: i64,
+        client: &PgClient,
+    ) -> Result<Option<Self>, BotError> {
         let query = "SELECT * from chats WHERE chat_id = $1 LIMIT 1";
-        let row = client.query_one(query, &[&chat_id]).await?;
-        Self::from_sql(row)
+        let row_opt = client.query_opt(query, &[&chat_id]).await?;
+        match row_opt {
+            Some(row) => Ok(Some(Self::from_sql(row)?)),
+            None => Ok(None),
+        }
+    }
+
+    pub async fn get_all_unread(pg_client: &PgClient) -> Result<Vec<Self>, BotError> {
+        let mut chats: Vec<ChatMeta> = Vec::new();
+        let query = "SELECT * from chats WHERE last_message_id > last_read_message_id";
+        let rows = pg_client.query(query, &[]).await?;
+        for row in rows {
+            chats.push(Self::from_sql(row)?)
+        }
+        Ok(chats)
     }
 }
 
@@ -122,11 +152,13 @@ pub async fn get_chat(json_str: Value, pg_client: &PgClient) -> Result<Option<Ch
             if last_message.is_outgoing() {
                 last_received_message_id = 0;
             }
+            let message_content = match_message_content(last_message.content())?;
             let chat_meta = ChatMeta::new(
                 chat.id(),
                 chat.last_read_inbox_message_id(),
                 last_received_message_id,
                 chat.title().to_string(),
+                message_content.text().to_string(),
             );
             chat_meta.insert(pg_client).await?;
             debug!("{:?}", chat_meta);

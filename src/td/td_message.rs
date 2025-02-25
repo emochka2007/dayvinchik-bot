@@ -2,6 +2,7 @@ use crate::common::{BotError, ChatId, FileId, MessageId};
 use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_match::ProfileMatch;
 use crate::entities::profile_reviewer::{ProcessingStatus, ProfileReviewer};
+use crate::entities::superlike::SuperLike;
 use crate::entities::task::Task;
 use crate::pg::pg::{DbQuery, PgClient};
 use crate::td::td_file::td_file_download;
@@ -12,7 +13,6 @@ use rust_tdlib::types::{
     GetChatHistory, Message, MessageContent, Messages, TextEntity, TextEntityType,
 };
 use serde_json::Value;
-use tokio_postgres::Error;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -40,7 +40,7 @@ impl MessageMeta {
         {
             is_read = false;
         }
-        let parsed_content = match_message_content(msg.content().clone())?;
+        let parsed_content = match_message_content(msg.content())?;
         Ok(Self {
             id: Uuid::new_v4().to_string(),
             message_id: msg.id(),
@@ -112,7 +112,12 @@ pub struct ParseMessageContent {
     file_ids: Option<Vec<i32>>,
     local_path: String,
 }
-pub fn match_message_content(msg_content: MessageContent) -> std::io::Result<ParseMessageContent> {
+impl ParseMessageContent {
+    pub fn text(&self) -> &String {
+        &self.text
+    }
+}
+pub fn match_message_content(msg_content: &MessageContent) -> std::io::Result<ParseMessageContent> {
     let mut parsed_content = ParseMessageContent {
         url: None,
         file_ids: None,
@@ -170,6 +175,13 @@ pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<(), B
         if let Some(message) = message.as_ref() {
             let parsed_message = MessageMeta::from_message(message, None)?;
             parsed_message.insert_db(pg_client).await?;
+            // Superlike notification
+            if SuperLike::is_superlike_notification(parsed_message.text()) {
+                DvBot::send_message(pg_client, "1").await?;
+                DvBot::read_last_message(pg_client).await?;
+                return Ok(());
+            }
+            // Match with url inside
             if parsed_message.is_match() {
                 if let Some(url) = &parsed_message.url {
                     let profile_match = ProfileMatch {
@@ -179,7 +191,6 @@ pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<(), B
                     profile_match.insert_db(pg_client).await?;
                 }
             }
-            debug!("Parsed message {:?}", parsed_message);
             if let Some(file_ids) = parsed_message.file_ids() {
                 // Upd: removed check for text, however it's good to verify, for some reason couldn't parse the text
                 if !file_ids.is_empty() {
@@ -195,6 +206,7 @@ pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<(), B
                         td_file_download(pg_client, profile_reviewer.main_file().unwrap()).await?;
                     }
                 } else {
+                    // Send dislike if video or image without image
                     // // todo mb this logic shouldnt be here
                     DvBot::send_dislike(pg_client).await?;
                     DvBot::refresh(pg_client).await?;

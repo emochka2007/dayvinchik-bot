@@ -1,8 +1,12 @@
 ## todo:
 
+- Info logs to read application
 - Auto-responder
+- Auto-responder parse last 3 messages mb for context.
+- Identify match
 - On start finish all profile_reviewers and clean up tasks
 - Smart superlike generation based on prompt from LLM
+- Superlike score
 - Auto-fail of profile_reviewer, if stuck for two long (couldnt find the image)
 
 ## Altushka Bot

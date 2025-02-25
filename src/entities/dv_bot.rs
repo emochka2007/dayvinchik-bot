@@ -9,6 +9,7 @@ use crate::td::td_chats::td_get_chats;
 use crate::td::td_message::td_get_last_message;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
+use log::error;
 use uuid::Uuid;
 
 pub struct DvBot<'a> {
@@ -107,8 +108,14 @@ impl<'a> DvBot<'a> {
     pub async fn read_last_message(pg_client: &PgClient) -> Result<(), BotError> {
         let limit = 1;
         let chat = ChatMeta::select_by_chat_id(VINCHIK_CHAT_INT, pg_client).await?;
-        td_get_last_message(pg_client, *chat.chat_id(), limit).await?;
-        // Self::update_bot_last_message(pg_client, *chat.chat_id()).await?;
+        match chat {
+            Some(chat) => {
+                td_get_last_message(pg_client, *chat.chat_id(), limit).await?;
+            }
+            None => {
+                error!("Vinchik Chat not found");
+            }
+        }
         Ok(())
     }
 
@@ -116,11 +123,21 @@ impl<'a> DvBot<'a> {
         td_open_chat(pg_client, VINCHIK_CHAT_INT).await?;
         Ok(())
     }
-    pub async fn update_bot_last_message(
-        pg_client: &PgClient,
-        chat_id: ChatId,
-    ) -> Result<(), BotError> {
-        td_chat_info(pg_client, chat_id).await?;
+    pub async fn update_bot_last_message(pg_client: &PgClient) -> Result<(), BotError> {
+        td_chat_info(pg_client, VINCHIK_CHAT_INT).await?;
+        Ok(())
+    }
+
+    pub async fn send_message(pg_client: &PgClient, text: &str) -> Result<(), BotError> {
+        let send_message = SendMessage::text_message(text, VINCHIK_CHAT);
+        let message = serde_json::to_string(&send_message)?;
+        Task::new(
+            message,
+            RequestKeys::SendMessage,
+            ResponseKeys::UpdateChatReadInbox,
+            pg_client,
+        )
+        .await?;
         Ok(())
     }
 }

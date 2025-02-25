@@ -15,6 +15,7 @@ CREATE table if not exists chats
     -- mb unique --
     last_read_message_id bigint                      not null,
     last_message_id      bigint                      not null,
+    last_message_text    text                        null,
     title                text                        not null,
     created_at           TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
     updated_at           TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp
@@ -100,4 +101,24 @@ Create table if not exists superlikes
     profile_reviewer_id uuid references profile_reviewers,
     created_at          TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
     updated_at          TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp
-)
+);
+CREATE OR REPLACE TRIGGER set_timestamp
+    BEFORE UPDATE
+    ON superlikes
+    FOR EACH ROW
+EXECUTE FUNCTION update_timestamp();
+Create table if not exists chat_responders
+(
+    id         uuid primary key                     default uuid_generate_v4(),
+    status     text                        not null,
+    chat_id    bigint,
+    msg_from   text                        not null,
+    msg_to     text                        null     default null,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp
+);
+CREATE OR REPLACE TRIGGER set_timestamp
+    BEFORE UPDATE
+    ON chat_responders
+    FOR EACH ROW
+EXECUTE FUNCTION update_timestamp();

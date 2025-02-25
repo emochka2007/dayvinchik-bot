@@ -44,9 +44,7 @@ impl OpenAI {
         }
     }
 
-    pub async fn _send_user_message(&self, message: String) -> Result<String, BotError> {
-        let prompt = Prompt::main(&message);
-        let content = prompt.user;
+    pub async fn send_user_message(&self, content: String) -> Result<String, BotError> {
         let body = json!({
         "model": "gpt-4o",
         "store": true,

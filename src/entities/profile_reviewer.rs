@@ -262,7 +262,7 @@ impl ProfileReviewer {
             .update_status(pg_client, ProcessingStatus::Pending)
             .await?;
         let open_ai = OpenAI::new()?;
-        let prompt = Prompt::analyze_alt();
+        let prompt = Prompt::general();
         let file_id = profile_reviewer.main_file().unwrap();
         let main_file = format!("profile_images/{file_id}.png");
         let base64_image =
@@ -270,8 +270,9 @@ impl ProfileReviewer {
         let response = open_ai
             .send_sys_image_message(prompt.system.unwrap(), prompt.user, base64_image)
             .await?;
-        error!("Response {response}");
-        let score = response.parse::<i32>()?;
+        error!("OpenAI response: {response}");
+        //todo regex
+        let score = response.trim().parse::<i32>()?;
         profile_reviewer.finalize(pg_client, score).await?;
         let reviewed_file = format!("reviewed_images/{}.png", profile_reviewer.id());
         move_file(&main_file, &reviewed_file)?;
@@ -305,23 +306,19 @@ impl ProfileReviewer {
         }
     }
     pub async fn is_reviewer_stuck(pg_client: &PgClient) -> Result<bool, BotError> {
-        let query = "SELECT * FROM profile_reviewers ORDER BY updated_at DESC LIMIT 1";
+        let query = "SELECT * FROM profile_reviewers WHERE status <> 'PROCESSED' ORDER BY updated_at DESC LIMIT 1";
         let row_opt = pg_client.query_opt(query, &[]).await?;
         match row_opt {
             Some(row) => {
-                if Task::find_start(pg_client).await?.is_some() {
+                if Task::find_start(pg_client).await?.is_none() {
                     let updated_at: SystemTime = row.try_get("updated_at")?;
                     let now = SystemTime::now();
                     let time_passed = now.duration_since(updated_at).unwrap();
-                    return Ok(time_passed > Duration::from_secs(120));
+                    return Ok(time_passed > Duration::from_secs(180));
                 }
                 Ok(false)
             }
-            None => Err(io::Error::new(
-                ErrorKind::NotFound,
-                "Is reviewer stuck error, not found the row",
-            )
-            .into()),
+            None => Ok(true),
         }
     }
 }

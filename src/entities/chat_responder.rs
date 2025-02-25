@@ -1,16 +1,31 @@
 use crate::common::{BotError, ChatId};
+use crate::constants::{VINCHIK_CHAT, VINCHIK_CHAT_INT};
+use crate::entities::chat_meta::ChatMeta;
 use crate::entities::profile_reviewer::ProcessingStatus;
+use crate::entities::task::Task;
+use crate::messages::message::SendMessage;
+use crate::openapi::llm_api::OpenAI;
 use crate::pg::pg::{DbQuery, DbStatusQuery, PgClient};
+use crate::prompts::Prompt;
+use crate::td::td_chats::td_get_chats;
+use crate::td::td_request::RequestKeys;
+use crate::td::td_response::ResponseKeys;
 use async_trait::async_trait;
+use log::error;
 use tokio_postgres::Row;
 use uuid::Uuid;
 
+/// 1. Update chats
+/// 2. Get unread chats
+/// 3. Get chat last_message
+/// 4. Gets the response with llm with Actor behavior how to react to it
+///    todo: Check if this chat in matches?
 pub struct ChatResponder {
     id: Uuid,
     status: ProcessingStatus,
     chat_id: ChatId,
-    from: String,
-    to: Option<String>,
+    msg_from: String,
+    msg_to: Option<String>,
 }
 
 #[async_trait]
@@ -30,7 +45,7 @@ impl DbQuery for ChatResponder {
                     &self.id,
                     &ProcessingStatus::Waiting.to_str()?,
                     &self.chat_id,
-                    &self.from,
+                    &self.msg_from,
                 ],
             )
             .await?;
@@ -45,8 +60,8 @@ impl DbQuery for ChatResponder {
             id: row.try_get("id")?,
             chat_id: row.try_get("chat_id")?,
             status: row.try_get("status")?,
-            from: row.try_get("from")?,
-            to: row.try_get("to")?,
+            msg_from: row.try_get("msg_from")?,
+            msg_to: row.try_get("msg_to")?,
         })
     }
 }
@@ -85,9 +100,37 @@ impl ChatResponder {
             id: Uuid::new_v4(),
             status: ProcessingStatus::Waiting,
             chat_id,
-            from: from.to_string(),
-            to: None,
+            msg_from: from.to_string(),
+            msg_to: None,
         }
+    }
+    pub async fn start(pg_client: &PgClient) -> Result<(), BotError> {
+        //acquire
+        // get_all_chats
+        // todo get chats only by condition one time
+        // todo in 10 mins or smth
+        // td_get_chats(pg_client).await?;
+        let chats = ChatMeta::get_all_unread(pg_client).await?;
+        println!("CHATS {:?}", chats);
+        for chat in chats {
+            if *chat.chat_id() != VINCHIK_CHAT_INT {
+                let open_ai = OpenAI::new()?;
+                let prompt = Prompt::chat_responder(chat.last_message_text());
+                let response = open_ai.send_user_message(prompt.user).await?;
+                error!("OpenAI response: {response}");
+                let chat_id_str = chat.chat_id().to_string();
+                let send_message = SendMessage::text_message(&response, &chat_id_str);
+                let message = serde_json::to_string(&send_message)?;
+                Task::new(
+                    message,
+                    RequestKeys::SendMessage,
+                    ResponseKeys::UpdateChatReadInbox,
+                    pg_client,
+                )
+                .await?;
+            }
+        }
+        Ok(())
     }
     // pub fn update_to(&self, to: &str) -> Result<(), BotError> {}
 }
