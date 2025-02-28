@@ -26,7 +26,7 @@ pub struct FormattedText {
 //todo implement serialize
 impl SendMessage {
     pub fn dislike(chat_id: &str) -> Self {
-        let message = SendMessage {
+        SendMessage {
             t: "sendMessage".to_string(),
             chat_id: chat_id.to_string(),
             input_message_content: InputMessageContent {
@@ -36,11 +36,10 @@ impl SendMessage {
                     text: "👎".to_string(),
                 },
             },
-        };
-        message
+        }
     }
     pub fn like(chat_id: &str) -> Self {
-        let message = SendMessage {
+        SendMessage {
             t: "sendMessage".to_string(),
             chat_id: chat_id.to_string(),
             input_message_content: InputMessageContent {
@@ -50,8 +49,7 @@ impl SendMessage {
                     text: "👍".to_string(),
                 },
             },
-        };
-        message
+        }
     }
 
     pub fn super_like(chat_id: &str) -> Self {
@@ -69,7 +67,7 @@ impl SendMessage {
     }
 
     pub fn text_message(text: &str, chat_id: &str) -> Self {
-        let message = SendMessage {
+        SendMessage {
             t: "sendMessage".to_string(),
             chat_id: chat_id.to_string(),
             input_message_content: InputMessageContent {
@@ -79,8 +77,7 @@ impl SendMessage {
                     text: text.to_string(),
                 },
             },
-        };
-        message
+        }
     }
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

@@ -1,29 +1,15 @@
-## todo:
+## Feature in progress
 
-- Info logs to read application
-- Auto-responder
-- Auto-responder parse last 3 messages mb for context.
-- Identify match
-- On start finish all profile_reviewers and clean up tasks
-- Smart superlike generation based on prompt from LLM
-- Superlike score
-- Auto-fail of profile_reviewer, if stuck for two long (couldnt find the image)
+- Learning tool to educate model
 
 ## Altushka Bot
 
-- Identifies altushka from chat bot using LLM with a score, and will talk for u
+- Identifies emo-girls from chat bot using LLM with a score
 
 ### Current implementation
 
-- Callback executor with a queue
-- move all global states to PG
-- vectorize data in pg
-- educating tool to store only correct data
 - send out to all matches MSG_STARTER
-- multiple variants to start (love ur style, nyashka, wanna go for a walk) conside
-- iterate over cities with one account.
 - all db entities in one folder
-- vectorize all of my chats and store in pg
 
 - Roadmap
     - TDlib setup
@@ -46,21 +32,3 @@
         - Log each response from GPT and assign to `PROFILE_ID`
         - save each dialogue in a separate file
 
--- features --
-
-- Random timestamp between answers
-- Goals and checks in chat, getting info about girl (name, age, activity, favourite animal)
-- analyze ignored chats (no answer for more than 24 hrs)
-- Find altushka from the photo and identify.
--
-
-## Done
-
-- Detect unread messages
-- list all active matches
-- Get the match message
-- interact with db
-- Store the currently reviewing profi to send all photos to gpt to analuze
-- Insert each review inside the db with the status `PENDING`, 'COMPLETED'
-- Custom errors
-- Superlikes random choice for now

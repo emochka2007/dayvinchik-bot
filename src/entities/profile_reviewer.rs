@@ -1,4 +1,5 @@
 use crate::common::BotError;
+use crate::entities::dv_bot::DvBot;
 use crate::entities::task::Task;
 use crate::file::{file_exists, get_image_with_retries, move_file};
 use crate::openapi::llm_api::OpenAI;
@@ -262,20 +263,25 @@ impl ProfileReviewer {
             .update_status(pg_client, ProcessingStatus::Pending)
             .await?;
         let open_ai = OpenAI::new()?;
-        let prompt = Prompt::general();
+        let prompt = Prompt::analyze_alt();
         let file_id = profile_reviewer.main_file().unwrap();
         let main_file = format!("profile_images/{file_id}.png");
         let base64_image =
             get_image_with_retries(&main_file, &profile_reviewer.local_img_path).await?;
-        let response = open_ai
+        if let Ok(response) = open_ai
             .send_sys_image_message(prompt.system.unwrap(), prompt.user, base64_image)
-            .await?;
-        error!("OpenAI response: {response}");
-        //todo regex
-        let score = response.trim().parse::<i32>()?;
-        profile_reviewer.finalize(pg_client, score).await?;
-        let reviewed_file = format!("reviewed_images/{}.png", profile_reviewer.id());
-        move_file(&main_file, &reviewed_file)?;
+            .await
+        {
+            error!("OpenAI response: {response}");
+            //todo regex
+            let score = response.trim().parse::<i32>()?;
+            profile_reviewer.finalize(pg_client, score).await?;
+            let reviewed_file = format!("reviewed_images/{}.png", profile_reviewer.id());
+            move_file(&main_file, &reviewed_file)?;
+        } else {
+            error!("Couldn't parse the OpenAI response");
+            DvBot::send_dislike(pg_client).await?;
+        }
         Ok(())
     }
 
@@ -318,7 +324,7 @@ impl ProfileReviewer {
                 }
                 Ok(false)
             }
-            None => Ok(true),
+            None => Ok(false),
         }
     }
 }

@@ -31,8 +31,7 @@ If you unable to return an answer, just return 0 (only-digit)
         // todo chosen actor and MyProfile
         let sys_prompt = "\
 Analyze the provided image to determine if the depicted subject is a genuine human.
-Specifically, assess whether the subject appears to be female.
-If the subject is identified as a woman, output the number 100; otherwise, output 0.
+If the subject is identified as a human, output the number 100; otherwise, output 0.
 Please provide only the single numeric result as your final answer.
         "
         .to_string();

@@ -3,6 +3,7 @@ mod auth;
 mod common;
 mod constants;
 mod cron;
+mod embeddings;
 mod entities;
 mod errors;
 mod file;
@@ -57,7 +58,7 @@ async fn main() -> Result<(), BotError> {
             });
 
             if let Some(x) = msg {
-                // info!("X -> {x}");
+                debug!("X -> {x}");
                 parse_message(&x, &client)
                     .await
                     .unwrap_or_else(|e| error!("Parse message {:?}", e));
@@ -66,7 +67,6 @@ async fn main() -> Result<(), BotError> {
     });
 
     // todo wait for register -> change to func state checker
-    info!("Tdlib init");
     // IF QR AUTH NEEDED
     // qr_auth_init(client_id);
 
@@ -118,7 +118,7 @@ async fn main() -> Result<(), BotError> {
     //         ChatResponder::start(&client)
     //             .await
     //             .unwrap_or_else(|e| error!("Chat Responder start {:?}", e));
-    //         sleep(Duration::from_secs(1200)).await;
+    //         sleep(Duration::from_secs(30)).await;
     //     }
     // });
 

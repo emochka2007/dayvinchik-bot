@@ -2,7 +2,7 @@ use crate::common::BotError;
 use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_reviewer::{ProcessingStatus, ProfileReviewer};
 use crate::entities::superlike::SuperLike;
-use crate::pg::pg::{DbStatusQuery, PgClient};
+use crate::pg::pg::{DbQuery, DbStatusQuery, PgClient};
 use crate::prompts::Prompt;
 use log::{error, info};
 use std::time::Duration;
@@ -42,9 +42,7 @@ impl Actor {
 
     /// First we update the chat and only after update latest messages for dv bot
     pub async fn analyze(&self, pg_client: &PgClient) -> Result<(), BotError> {
-        fix  Actor analyze error Postgres { source: Error { kind: RowCount, cause: None }, backtrace: <disabled> }
-
-        error!("Analyzing...");
+        info!("Analyzing...");
         DvBot::refresh(pg_client).await?;
         DvBot::read_last_message(pg_client).await?;
         //break statement mb
@@ -56,6 +54,7 @@ impl Actor {
                 error!("reviewer is stuck fixing");
                 DvBot::refresh(pg_client).await?;
                 DvBot::read_last_message(pg_client).await?;
+                ProfileReviewer::clean_up(pg_client).await?;
             }
 
             if let Some(completed_reviewer) =
@@ -76,6 +75,5 @@ impl Actor {
                 }
             }
         }
-        Ok(())
     }
 }

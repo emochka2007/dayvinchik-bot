@@ -105,11 +105,6 @@ impl ChatResponder {
         }
     }
     pub async fn start(pg_client: &PgClient) -> Result<(), BotError> {
-        //acquire
-        // get_all_chats
-        // todo get chats only by condition one time
-        // todo in 10 mins or smth
-        // td_get_chats(pg_client).await?;
         let chats = ChatMeta::get_all_unread(pg_client).await?;
         println!("CHATS {:?}", chats);
         for chat in chats {
@@ -128,6 +123,7 @@ impl ChatResponder {
                     pg_client,
                 )
                 .await?;
+                td_get_chats(pg_client).await?;
             }
         }
         Ok(())

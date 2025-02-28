@@ -101,7 +101,6 @@ impl ChatMeta {
         }
     }
     /// Don't mix up with the trait which looks by UUID
-    /// todo query_opt
     pub async fn select_by_chat_id(
         chat_id: i64,
         client: &PgClient,

@@ -207,9 +207,9 @@ pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<(), B
                     }
                 } else {
                     // Send dislike if video or image without image
-                    // // todo mb this logic shouldnt be here
                     DvBot::send_dislike(pg_client).await?;
                     DvBot::refresh(pg_client).await?;
+                    DvBot::read_last_message(pg_client).await?;
                 }
             }
         }
