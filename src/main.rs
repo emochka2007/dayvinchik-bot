@@ -16,15 +16,19 @@ mod prompts;
 mod start_phrases;
 mod td;
 
+use crate::common::BotError::OllamaError;
 use crate::common::{env_init, BotError};
 use crate::cron::cron_manager;
+use crate::embeddings::ollama::OllamaVision;
 use crate::entities::actor::{Actor, ActorType};
 use crate::entities::chat_responder::ChatResponder;
 use crate::entities::dv_bot::DvBot;
+use crate::entities::image_embeddings::{get_and_store_embedding, ImageEmbeddings};
 use crate::entities::profile_reviewer::ProfileReviewer;
+use crate::file::image_to_base64;
 use crate::helpers::input;
 use crate::input::match_input;
-use crate::pg::pg::PgConnect;
+use crate::pg::pg::{DbQuery, PgConnect};
 use crate::td::init_tdlib_params;
 use crate::td::read::parse_message;
 use crate::td::td_json::{new_client, receive};
@@ -41,9 +45,10 @@ async fn main() -> Result<(), BotError> {
     init_tdlib_params(client_id);
 
     let pool = PgConnect::create_pool_from_env()?;
-
     let client = pool.get().await?;
     PgConnect::run_migrations(&client).await?;
+    get_and_store_embedding(&client).await?;
+    return Ok(());
     PgConnect::clean_db(&client).await?;
 
     tokio::spawn(async move {

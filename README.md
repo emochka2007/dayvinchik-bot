@@ -1,5 +1,6 @@
 ## Feature in progress
 
+- Слишком много ❤️ за сегодня. stop bot
 - Learning tool to educate model
 
 ## Altushka Bot

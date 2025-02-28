@@ -66,4 +66,15 @@ System rules:
             user: sys_prompt,
         }
     }
+    pub fn llava_image() -> String {
+        let prompt = "Analyze the image I provide with a detailed focus on the following aspects:\n
+Subject Identification: Determine if the subject is female and estimate her approximate age.\n
+Facial Features: Examine the symmetry of the face, noting any distinct features.\n
+Hair Characteristics: Identify if the hair is long or short, its color, and style.\n
+Eyes: Determine the eye color if visible.\n
+Interests & Activities: Look for visual clues (e.g., accessories, background elements, or props) that might suggest interests such as music, art, or other hobbies. \n
+Cultural & National Identity: If possible, infer hints about the subject’s nationality or cultural background based on facial features or style. \n
+Overall Impression: Provide a comprehensive description that ties together physical details with possible personality traits and lifestyle interests. \n".to_string();
+        prompt.to_string()
+    }
 }

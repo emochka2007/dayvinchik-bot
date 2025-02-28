@@ -1,4 +1,5 @@
 use deadpool_postgres::PoolError;
+use ollama_rs::error::OllamaError;
 use rand::Rng;
 use rust_tdlib::tdjson::set_log_verbosity_level;
 use std::backtrace::Backtrace;
@@ -60,6 +61,13 @@ pub enum BotError {
     ReqwestError {
         #[from]
         source: reqwest::Error,
+        #[backtrace]
+        backtrace: Backtrace,
+    },
+    #[error("Ollama error: {source}")]
+    OllamaError {
+        #[from]
+        source: OllamaError,
         #[backtrace]
         backtrace: Backtrace,
     },

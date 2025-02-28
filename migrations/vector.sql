@@ -1,6 +1,8 @@
-CREATE EXTENSION vector;
-CREATE TABLE items
+CREATE TABLE if not exists public.image_embeddings
 (
-    id        bigserial PRIMARY KEY,
-    embedding vector(3)
+    id          serial4       NOT NULL,
+    image_path  text          NOT NULL,
+    description text          NOT NULL,
+    embedding   public.vector NULL,
+    CONSTRAINT image_embeddings_pkey PRIMARY KEY (id)
 );

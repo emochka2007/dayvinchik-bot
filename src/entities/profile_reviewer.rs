@@ -274,13 +274,20 @@ impl ProfileReviewer {
         {
             error!("OpenAI response: {response}");
             //todo regex
-            let score = response.trim().parse::<i32>()?;
-            profile_reviewer.finalize(pg_client, score).await?;
-            let reviewed_file = format!("reviewed_images/{}.png", profile_reviewer.id());
-            move_file(&main_file, &reviewed_file)?;
+            if let Ok(score) = response.trim().parse::<i32>() {
+                profile_reviewer.finalize(pg_client, score).await?;
+                let reviewed_file = format!("reviewed_images/{}.png", profile_reviewer.id());
+                move_file(&main_file, &reviewed_file)?;
+            } else {
+                error!("Couldn't parse the OpenAI response {response}");
+                DvBot::send_dislike(pg_client).await?;
+            }
         } else {
-            error!("Couldn't parse the OpenAI response");
+            error!("Could not parse the open_ai response");
             DvBot::send_dislike(pg_client).await?;
+            profile_reviewer
+                .update_status(pg_client, ProcessingStatus::Failed)
+                .await?;
         }
         Ok(())
     }

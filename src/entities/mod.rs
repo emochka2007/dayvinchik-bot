@@ -2,6 +2,7 @@ pub mod actor;
 pub mod chat_meta;
 pub mod chat_responder;
 pub mod dv_bot;
+pub mod image_embeddings;
 mod profile;
 pub mod profile_match;
 pub mod profile_reviewer;
