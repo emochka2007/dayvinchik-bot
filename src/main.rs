@@ -17,7 +17,7 @@ mod prompts;
 mod start_phrases;
 mod td;
 
-use crate::common::{env_init, BotError};
+use crate::common::{env_init, BotError, MessageId};
 use crate::cron::cron_manager;
 use crate::entities::actor::{Actor, ActorType};
 use crate::entities::chat_responder::ChatResponder;
@@ -50,9 +50,10 @@ async fn main() -> Result<(), BotError> {
     PgConnect::clean_db(&client).await?;
 
     tokio::spawn(async move {
+        let processed_images: Vec<MessageId> = Vec::new();
         loop {
             let msg = tokio::task::spawn_blocking(|| {
-                receive(0.1) // td_receive
+                receive(1.5) // td_receive
             })
             .await
             .unwrap_or_else(|e| {
@@ -62,19 +63,20 @@ async fn main() -> Result<(), BotError> {
 
             if let Some(x) = msg {
                 debug!("X -> {x}");
-                parse_message(&x, &client)
+                parse_message(&client, &x)
                     .await
                     .unwrap_or_else(|e| error!("Parse message {:?}", e));
             }
         }
     });
 
-    // if let Ok(client) = pool.get().await {
-    //     tokio::spawn(async move {
-    //         MatchAnalyzer::read_messages_from_db(&client).await.unwrap();
-    //     });
-    // }
-    // return Ok(());
+    if let Ok(client) = pool.get().await {
+        tokio::spawn(async move {
+            MatchAnalyzer::start(&client).await.unwrap_or_else(|e| {
+                error!("Match Analyzer {:?}", e);
+            });
+        });
+    }
 
     // todo wait for register -> change to func state checker
     // IF QR AUTH NEEDED
@@ -90,25 +92,25 @@ async fn main() -> Result<(), BotError> {
         .await
         .unwrap_or_else(|e| panic!("Couldn't get the client from pool {:?}", e));
 
-    tokio::spawn(async move {
-        Actor::new(ActorType::Default, 50)
-            .analyze(&client)
-            .await
-            .unwrap_or_else(|e| {
-                error!("Actor analyze error {:?}", e);
-            });
-    });
+    // tokio::spawn(async move {
+    //     Actor::new(ActorType::Default, 50)
+    //         .analyze(&client)
+    //         .await
+    //         .unwrap_or_else(|e| {
+    //             error!("Actor analyze error {:?}", e);
+    //         });
+    // });
 
-    let client = pool.get().await?;
-    tokio::spawn(async move {
-        //todo move loop internally
-        loop {
-            ProfileReviewer::start(&client)
-                .await
-                .unwrap_or_else(|e| error!("ProfileReviewer start {:?}", e));
-            sleep(Duration::from_secs(10)).await;
-        }
-    });
+    // let client = pool.get().await?;
+    // tokio::spawn(async move {
+    //     //todo move loop internally
+    //     loop {
+    //         ProfileReviewer::start(&client)
+    //             .await
+    //             .unwrap_or_else(|e| error!("ProfileReviewer start {:?}", e));
+    //         sleep(Duration::from_secs(10)).await;
+    //     }
+    // });
 
     // let client = pool.get().await?;
     // tokio::spawn(async move {

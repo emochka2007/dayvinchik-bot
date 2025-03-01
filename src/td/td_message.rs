@@ -1,13 +1,15 @@
 use crate::common::{BotError, ChatId, FileId, MessageId};
+use crate::constants::PROCESSED_MESSAGE_IDS;
 use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_reviewer::{ProcessingStatus, ProfileReviewer};
+use crate::entities::superlike::SuperLike;
 use crate::entities::task::Task;
 use crate::pg::pg::{DbQuery, PgClient};
 use crate::td::td_file::td_file_download;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
 use async_trait::async_trait;
-use log::{debug, error};
+use log::{debug, error, info};
 use rust_tdlib::types::{
     GetChatHistory, Message, MessageContent, Messages, TextEntity, TextEntityType,
 };
@@ -79,17 +81,8 @@ impl DbQuery for MessageMeta {
 }
 
 impl MessageMeta {
-    pub fn from_message(
-        msg: &Message,
-        last_read_inbox_message_id: Option<MessageId>,
-    ) -> Result<Self, BotError> {
-        let mut is_read = true;
-        if !msg.is_outgoing()
-            && last_read_inbox_message_id.is_some()
-            && msg.id() > last_read_inbox_message_id.unwrap()
-        {
-            is_read = false;
-        }
+    pub fn from_message(msg: &Message) -> Result<Self, BotError> {
+        let is_read = true;
         let parsed_content = match_message_content(msg.content())?;
         Ok(Self {
             id: Uuid::new_v4().to_string(),
@@ -128,12 +121,17 @@ impl MessageMeta {
     }
     pub async fn get_all_unprocessed(pg_client: &PgClient) -> Result<Vec<Self>, BotError> {
         let mut unprocessed_messages = Vec::new();
-        let query = "SELECT * from messages WHERE processed <> true";
+        let query = "SELECT * from messages WHERE processed <> true AND url IS NOT NULL ";
         let rows = pg_client.query(query, &[]).await?;
         for row in rows {
             unprocessed_messages.push(Self::from_sql(row)?)
         }
         Ok(unprocessed_messages)
+    }
+    pub async fn process(&self, pg_client: &PgClient) -> Result<(), BotError> {
+        let query = "UPDATE messages SET processed = true WHERE id = $1";
+        pg_client.query(query, &[&self.id]).await?;
+        Ok(())
     }
 }
 
@@ -199,13 +197,49 @@ fn get_url_entity(entities: &Vec<TextEntity>, content: &mut ParseMessageContent)
     }
 }
 
+//todo mb cache memory to skip processed_ids
 pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<(), BotError> {
     let messages: Messages = serde_json::from_value(json_str)?;
     debug!("messages {:?}", messages);
     for message in messages.messages() {
+        debug!("Message {:?}", message);
         if let Some(message) = message.as_ref() {
-            let parsed_message = MessageMeta::from_message(message, None)?;
+            // let processed_messages = PROCESSED_MESSAGE_IDS.blocking_lock();
+            // if processed_messages.contains(&message.id()) {
+            //     info!("Message skipped {}", message.id());
+            //     continue;
+            // } else {
+            //     // Cache memory for skipping processed messages
+            //     PROCESSED_MESSAGE_IDS.blocking_lock().push(message.id());
+            // }
+
+            let parsed_message = MessageMeta::from_message(message)?;
+            let block_phrases = [
+                "✨🔍",
+                "Так выглядит твоя анкета:",
+                "1",
+                "никита, 21",
+                "/start",
+                "unmatched",
+                "Бот знакомств Дайвинчик🍷",
+                "Слишком много ❤️ за сегодня.",
+            ];
+            let is_blocked = block_phrases
+                .iter()
+                .any(|phrase| parsed_message.text().contains(phrase));
+
+            if is_blocked || parsed_message.text().is_empty() {
+                error!("Skipping message {}", parsed_message.text());
+                continue;
+            }
+
             parsed_message.insert(pg_client).await?;
+            // Check for notification
+            if SuperLike::is_superlike_notification(parsed_message.text()) {
+                DvBot::send_message(pg_client, "1").await?;
+                DvBot::read_last_message(pg_client).await?;
+                continue;
+            }
             if let Some(file_ids) = parsed_message.file_ids() {
                 // Upd: removed check for text, however it's good to verify, for some reason couldn't parse the text
                 if !file_ids.is_empty() {
@@ -240,6 +274,29 @@ pub async fn td_get_last_message(
         .chat_id(chat_id)
         .from_message_id(0)
         .limit(limit)
+        .build();
+    let message = serde_json::to_string(&history_message)?;
+    Task::new(
+        message,
+        RequestKeys::GetChatHistory,
+        ResponseKeys::Messages,
+        pg_client,
+    )
+    .await?;
+    Ok(())
+}
+pub async fn td_read_one_from_message_id(
+    pg_client: &PgClient,
+    chat_id: ChatId,
+    message_id: MessageId,
+    offset: i32,
+) -> Result<(), BotError> {
+    let history_message = GetChatHistory::builder()
+        .chat_id(chat_id)
+        //todo 0
+        .from_message_id(13981712384)
+        .offset(0)
+        .limit(offset)
         .build();
     let message = serde_json::to_string(&history_message)?;
     Task::new(
