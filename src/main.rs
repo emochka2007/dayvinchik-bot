@@ -15,6 +15,7 @@ mod pg;
 mod prompts;
 mod start_phrases;
 mod td;
+mod viuer;
 
 use crate::common::BotError::OllamaError;
 use crate::common::{env_init, BotError};
@@ -32,6 +33,7 @@ use crate::pg::pg::{DbQuery, PgConnect};
 use crate::td::init_tdlib_params;
 use crate::td::read::parse_message;
 use crate::td::td_json::{new_client, receive};
+use crate::viuer::display_image_in_terminal;
 use log::{debug, error, info};
 use std::env;
 use std::time::Duration;
@@ -43,13 +45,24 @@ async fn main() -> Result<(), BotError> {
     env_init();
     let client_id = new_client();
     init_tdlib_params(client_id);
-
+    // display_image_in_terminal("alt_images/popusk.jpg");
+    //
+    // return Ok(());
     let pool = PgConnect::create_pool_from_env()?;
     let client = pool.get().await?;
     PgConnect::run_migrations(&client).await?;
-    get_and_store_embedding(&client).await?;
-    return Ok(());
     PgConnect::clean_db(&client).await?;
+
+    match dotenvy::var("EDU") {
+        Ok(_value) => {
+            get_and_store_embedding(&client).await.unwrap_or_else(|e| {
+                error!("Get and store embedding {:?}", e);
+            });
+        }
+        Err(e) => {
+            debug!("EDU var is not set {:?}", e);
+        }
+    }
 
     tokio::spawn(async move {
         loop {

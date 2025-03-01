@@ -3,7 +3,9 @@ use crate::embeddings::ollama::OllamaVision;
 use crate::file::image_to_base64;
 use crate::pg::pg::{DbQuery, PgClient};
 use async_trait::async_trait;
+use log::info;
 use pgvector::Vector;
+use std::fs;
 use tokio_postgres::Row;
 
 pub struct ImageEmbeddings {
@@ -48,10 +50,16 @@ impl ImageEmbeddings {
         println!("{:?}", row);
         Ok(())
     }
+    pub async fn pick_and_store_reviewed_images(pg_client: &PgClient) -> Result<(), BotError> {
+        let paths = fs::read_dir("./reviewed_images")?;
+        for file in paths {
+            let file_name = file?.path();
+        }
+        Ok(())
+    }
 }
 pub async fn get_and_store_embedding(pg_client: &PgClient) -> Result<(), BotError> {
     let popusk_base64 = image_to_base64("alt_images/popusk.jpg").unwrap();
-
     let ollama_vision = OllamaVision::new();
     let description = ollama_vision.describe_image(popusk_base64).await.unwrap();
     let vector = ollama_vision
