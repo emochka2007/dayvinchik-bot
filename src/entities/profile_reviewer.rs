@@ -7,7 +7,7 @@ use crate::pg::pg::{DbQuery, DbStatusQuery, PgClient};
 use crate::prompts::Prompt;
 use crate::td::td_file::td_file_download;
 use async_trait::async_trait;
-use log::{debug, error};
+use log::{debug, error, info};
 use std::error::Error;
 use std::io;
 use std::io::ErrorKind;
@@ -66,7 +66,6 @@ pub struct ProfileReviewer {
     score: Option<i32>,
     text: String,
     status: ProcessingStatus,
-    local_img_path: String,
     file_ids: Option<Vec<i32>>,
     updated_at: SystemTime,
 }
@@ -79,21 +78,12 @@ impl DbQuery for ProfileReviewer {
         chat_id, \
         text, \
         status,\
-        file_ids, \
-        local_img_path ) \
-        VALUES ($1,$2,$3,$4,$5)";
+        file_ids \
+        )\
+        VALUES ($1,$2,$3,$4)";
         let file_ids = self.file_ids.clone().unwrap();
         pg_client
-            .query(
-                query,
-                &[
-                    &self.chat_id,
-                    &self.text,
-                    &"WAITING",
-                    &file_ids,
-                    &self.local_img_path,
-                ],
-            )
+            .query(query, &[&self.chat_id, &self.text, &"WAITING", &file_ids])
             .await?;
         Ok(())
     }
@@ -109,7 +99,6 @@ impl DbQuery for ProfileReviewer {
             text: row.try_get("text")?,
             status: row.try_get("status")?,
             file_ids: Some(row.try_get("file_ids")?),
-            local_img_path: row.try_get("local_img_path")?,
             updated_at: row.try_get("updated_at")?,
         })
     }
@@ -152,12 +141,7 @@ impl DbStatusQuery for ProfileReviewer {
 }
 // todo implement diff struct ProfileReviewerDb
 impl ProfileReviewer {
-    pub fn new(
-        chat_id: i64,
-        text: &String,
-        status: ProcessingStatus,
-        local_img_path: String,
-    ) -> Self {
+    pub fn new(chat_id: i64, text: &String, status: ProcessingStatus) -> Self {
         Self {
             id: Uuid::new_v4(),
             chat_id,
@@ -165,7 +149,6 @@ impl ProfileReviewer {
             status,
             score: None,
             file_ids: None,
-            local_img_path,
             updated_at: SystemTime::now(),
         }
     }
@@ -174,9 +157,6 @@ impl ProfileReviewer {
     }
     pub fn _status(&self) -> &ProcessingStatus {
         &self.status
-    }
-    pub fn local_img_path(&self) -> &str {
-        &self.local_img_path
     }
     pub fn id(&self) -> &Uuid {
         &self.id
@@ -266,13 +246,12 @@ impl ProfileReviewer {
         let prompt = Prompt::analyze_alt();
         let file_id = profile_reviewer.main_file().unwrap();
         let main_file = format!("profile_images/{file_id}.png");
-        let base64_image =
-            get_image_with_retries(&main_file, &profile_reviewer.local_img_path).await?;
+        let base64_image = get_image_with_retries(&main_file).await?;
         if let Ok(response) = open_ai
             .send_sys_image_message(prompt.system.unwrap(), prompt.user, base64_image)
             .await
         {
-            error!("OpenAI response: {response}");
+            info!("OpenAI response: {response}");
             //todo regex
             let score = response.trim().parse::<i32>()?;
             profile_reviewer.finalize(pg_client, score).await?;
@@ -288,6 +267,7 @@ impl ProfileReviewer {
     pub async fn start(pg_client: &PgClient) -> Result<(), BotError> {
         match ProfileReviewer::acquire_last_waiting(pg_client).await? {
             Some(profile_reviewer) => {
+                info!("Profile Reviewer is in progress...");
                 //Check here for file existence
                 let file_id = profile_reviewer.main_file().unwrap();
                 let main_file = format!("profile_images/{file_id}.png");
@@ -320,6 +300,7 @@ impl ProfileReviewer {
                     let updated_at: SystemTime = row.try_get("updated_at")?;
                     let now = SystemTime::now();
                     let time_passed = now.duration_since(updated_at).unwrap();
+                    info!("Time passed secs {:}", time_passed.as_secs());
                     return Ok(time_passed > Duration::from_secs(180));
                 }
                 Ok(false)

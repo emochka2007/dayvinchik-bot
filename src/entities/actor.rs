@@ -48,6 +48,7 @@ impl Actor {
         //break statement mb
         loop {
             sleep(Duration::from_secs(5)).await;
+            info!("Actor is in progress...");
             // If reviewer is stuck for more than 1 minute, we run refresh
             let is_stuck = ProfileReviewer::is_reviewer_stuck(pg_client).await?;
             if is_stuck {

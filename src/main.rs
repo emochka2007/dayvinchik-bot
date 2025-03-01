@@ -9,6 +9,7 @@ mod errors;
 mod file;
 mod helpers;
 mod input;
+mod matches;
 mod messages;
 mod openapi;
 mod pg;
@@ -24,9 +25,11 @@ use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_reviewer::ProfileReviewer;
 use crate::helpers::input;
 use crate::input::match_input;
+use crate::matches::MatchAnalyzer;
 use crate::pg::pg::PgConnect;
 use crate::td::init_tdlib_params;
 use crate::td::read::parse_message;
+use crate::td::td_chats::td_get_chats;
 use crate::td::td_json::{new_client, receive};
 use log::{debug, error, info};
 use std::env;
@@ -66,6 +69,13 @@ async fn main() -> Result<(), BotError> {
         }
     });
 
+    // if let Ok(client) = pool.get().await {
+    //     tokio::spawn(async move {
+    //         MatchAnalyzer::read_messages_from_db(&client).await.unwrap();
+    //     });
+    // }
+    // return Ok(());
+
     // todo wait for register -> change to func state checker
     // IF QR AUTH NEEDED
     // qr_auth_init(client_id);
@@ -81,17 +91,6 @@ async fn main() -> Result<(), BotError> {
         .unwrap_or_else(|e| panic!("Couldn't get the client from pool {:?}", e));
 
     tokio::spawn(async move {
-        let dv_bot = DvBot::new(&client);
-        match dotenvy::var("UPDATE_CHAT") {
-            Ok(_value) => {
-                dv_bot.on_init().await.unwrap_or_else(|e| {
-                    error!("DV_BOT init error {:?}", e);
-                });
-            }
-            Err(e) => {
-                debug!("UPDATE_CHAT var is not set {:?}", e);
-            }
-        }
         Actor::new(ActorType::Default, 50)
             .analyze(&client)
             .await

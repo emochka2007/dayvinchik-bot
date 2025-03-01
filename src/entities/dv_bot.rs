@@ -22,11 +22,6 @@ impl<'a> DvBot<'a> {
     pub fn new(pg_client: &'a PgClient) -> Self {
         Self { pg_client }
     }
-    /// get all chats -> insert all chats into db or update last message id
-    pub async fn on_init(&self) -> Result<(), BotError> {
-        td_get_chats(self.pg_client).await?;
-        Ok(())
-    }
     pub async fn send_dislike(pg_client: &PgClient) -> Result<(), BotError> {
         let send_message = SendMessage::dislike(VINCHIK_CHAT);
         let message = serde_json::to_string(&send_message)?;
@@ -114,6 +109,7 @@ impl<'a> DvBot<'a> {
             }
             None => {
                 error!("Vinchik Chat not found");
+                td_get_chats(pg_client).await?;
             }
         }
         Ok(())
