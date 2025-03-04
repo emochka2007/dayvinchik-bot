@@ -30,12 +30,13 @@ Create table if not exists messages
 (
     id         uuid primary key                     default uuid_generate_v4(),
     chat_id    bigint                      not null,
-    message_id bigint                      not null,
+    message_id bigint unique               not null,
     is_read    boolean                     not null,
     text       text                        null,
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
-    url        text                        null
+    url        text                        null,
+    processed  bool                        not null
 );
 CREATE OR REPLACE TRIGGER set_timestamp
     BEFORE UPDATE
@@ -60,16 +61,15 @@ EXECUTE FUNCTION update_timestamp();
 
 Create table if not exists profile_reviewers
 (
-    id             uuid primary key                     default uuid_generate_v4(),
-    chat_id        bigint                      not null,
-    text           text                        null,
-    file_ids       int[]                                default array []::int[],
-    local_img_path text                        not null,
+    id         uuid primary key                     default uuid_generate_v4(),
+    chat_id    bigint                      not null,
+    text       text                        null,
+    file_ids   int[]                                default array []::int[],
     -- PENDING, WAITING, COMPLETE
-    status         text                                 default 'WAITING',
-    score          int                                  default 0,
-    created_at     TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
-    updated_at     TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp
+    status     text                                 default 'WAITING',
+    score      int                                  default 0,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT current_timestamp
 );
 CREATE OR REPLACE TRIGGER set_timestamp
     BEFORE UPDATE

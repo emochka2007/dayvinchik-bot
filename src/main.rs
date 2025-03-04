@@ -9,6 +9,7 @@ mod errors;
 mod file;
 mod helpers;
 mod input;
+mod matches;
 mod messages;
 mod openapi;
 mod pg;
@@ -16,14 +17,14 @@ mod prompts;
 mod start_phrases;
 mod td;
 
-use crate::common::{env_init, BotError};
+use crate::common::{env_init, BotError, MessageId};
 use crate::cron::cron_manager;
 use crate::entities::actor::{Actor, ActorType};
 use crate::entities::chat_responder::ChatResponder;
-use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_reviewer::ProfileReviewer;
 use crate::helpers::input;
 use crate::input::match_input;
+use crate::matches::MatchAnalyzer;
 use crate::pg::pg::PgConnect;
 use crate::td::init_tdlib_params;
 use crate::td::read::parse_message;
@@ -47,9 +48,10 @@ async fn main() -> Result<(), BotError> {
     PgConnect::clean_db(&client).await?;
 
     tokio::spawn(async move {
+        let processed_images: Vec<MessageId> = Vec::new();
         loop {
             let msg = tokio::task::spawn_blocking(|| {
-                receive(0.1) // td_receive
+                receive(1.5) // td_receive
             })
             .await
             .unwrap_or_else(|e| {
@@ -59,7 +61,7 @@ async fn main() -> Result<(), BotError> {
 
             if let Some(x) = msg {
                 debug!("X -> {x}");
-                parse_message(&x, &client)
+                parse_message(&client, &x)
                     .await
                     .unwrap_or_else(|e| error!("Parse message {:?}", e));
             }
@@ -81,17 +83,6 @@ async fn main() -> Result<(), BotError> {
         .unwrap_or_else(|e| panic!("Couldn't get the client from pool {:?}", e));
 
     tokio::spawn(async move {
-        let dv_bot = DvBot::new(&client);
-        match dotenvy::var("UPDATE_CHAT") {
-            Ok(_value) => {
-                dv_bot.on_init().await.unwrap_or_else(|e| {
-                    error!("DV_BOT init error {:?}", e);
-                });
-            }
-            Err(e) => {
-                debug!("UPDATE_CHAT var is not set {:?}", e);
-            }
-        }
         Actor::new(ActorType::Default, 50)
             .analyze(&client)
             .await
@@ -111,16 +102,28 @@ async fn main() -> Result<(), BotError> {
         }
     });
 
-    // let client = pool.get().await?;
-    // tokio::spawn(async move {
-    //     //todo move loop internally
-    //     loop {
-    //         ChatResponder::start(&client)
-    //             .await
-    //             .unwrap_or_else(|e| error!("Chat Responder start {:?}", e));
-    //         sleep(Duration::from_secs(30)).await;
-    //     }
-    // });
+    let build_env = env::var("BUILD")?;
+    if build_env == "UNSTABLE" {
+        if let Ok(client) = pool.get().await {
+            tokio::spawn(async move {
+                MatchAnalyzer::start(&client).await.unwrap_or_else(|e| {
+                    error!("Match Analyzer {:?}", e);
+                });
+            });
+        }
+
+        if let Ok(client) = pool.get().await {
+            tokio::spawn(async move {
+                //todo move loop internally
+                loop {
+                    ChatResponder::start(&client)
+                        .await
+                        .unwrap_or_else(|e| error!("Chat Responder start {:?}", e));
+                    sleep(Duration::from_secs(30)).await;
+                }
+            });
+        }
+    }
 
     let mode = env::var("MODE")?;
     if mode == "CRON" {

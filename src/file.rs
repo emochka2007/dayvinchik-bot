@@ -2,7 +2,6 @@ use crate::common::StdResult;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use log::{debug, error};
-use std::ffi::OsString;
 use std::fs::{read_dir, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -53,10 +52,7 @@ pub fn move_file(src: &str, dest: &str) -> StdResult {
     });
     Ok(())
 }
-pub async fn get_image_with_retries(path_to_img: &str, local_path: &str) -> io::Result<String> {
-    // if let Ok(base64_image) = image_to_base64(local_path) {
-    //     return Ok(base64_image);
-    // }
+pub async fn get_image_with_retries(path_to_img: &str) -> io::Result<String> {
     let base64_image = {
         //todo config
         let max_attempts = 3;

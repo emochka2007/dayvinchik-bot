@@ -1,8 +1,7 @@
 use crate::common::{BotError, ChatId, MessageId};
 use crate::entities::task::Task;
 use crate::pg::pg::{DbQuery, PgClient};
-use crate::td::td_json::ClientId;
-use crate::td::td_message::{match_message_content, MessageMeta};
+use crate::td::td_message::match_message_content;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
 use async_trait::async_trait;
@@ -11,8 +10,7 @@ use rust_tdlib::types::{Chat, GetChat as TdGetChat, OpenChat};
 use serde_json::Value;
 use std::io;
 use std::io::ErrorKind;
-use tokio_postgres::types::IsNull::No;
-use tokio_postgres::{Error, Row};
+use tokio_postgres::Row;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
