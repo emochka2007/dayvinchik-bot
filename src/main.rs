@@ -18,24 +18,19 @@ mod start_phrases;
 mod td;
 mod viuer;
 
-use crate::common::BotError::OllamaError;
 use crate::common::{env_init, BotError, MessageId};
 use crate::cron::cron_manager;
-use crate::embeddings::ollama::OllamaVision;
 use crate::entities::actor::{Actor, ActorType};
 use crate::entities::chat_responder::ChatResponder;
-use crate::entities::dv_bot::DvBot;
-use crate::entities::image_embeddings::{get_and_store_embedding, ImageEmbeddings};
+use crate::entities::image_embeddings::{get_and_store_embedding, get_score, ImageEmbeddings};
 use crate::entities::profile_reviewer::ProfileReviewer;
-use crate::file::image_to_base64;
 use crate::helpers::input;
 use crate::input::match_input;
-use crate::pg::pg::{DbQuery, PgConnect};
 use crate::matches::MatchAnalyzer;
+use crate::pg::pg::{DbQuery, PgConnect};
 use crate::td::init_tdlib_params;
 use crate::td::read::parse_message;
 use crate::td::td_json::{new_client, receive};
-use crate::viuer::display_image_in_terminal;
 use log::{debug, error, info};
 use std::env;
 use std::time::Duration;
@@ -55,17 +50,23 @@ async fn main() -> Result<(), BotError> {
 
     match dotenvy::var("EDU") {
         Ok(_value) => {
-            get_and_store_embedding(&client).await.unwrap_or_else(|e| {
-                error!("Get and store embedding {:?}", e);
-            });
+            get_score(
+                &client,
+                "./reviewed_images/445752c1-ff8a-4432-91ef-13cc72a445d0.png",
+            )
+            .await
+            .unwrap();
+            // get_and_store_embedding(&client).await.unwrap_or_else(|e| {
+            //     error!("Error in get_and_store_embedding {:?}", e);
+            // });
         }
         Err(e) => {
             debug!("EDU var is not set {:?}", e);
         }
     }
+    return Ok(());
 
     tokio::spawn(async move {
-        let processed_images: Vec<MessageId> = Vec::new();
         loop {
             let msg = tokio::task::spawn_blocking(|| {
                 receive(1.5) // td_receive
