@@ -1,7 +1,6 @@
 use crate::common::BotError;
 use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_reviewer::{ProcessingStatus, ProfileReviewer};
-use crate::entities::superlike::SuperLike;
 use crate::pg::pg::{DbQuery, DbStatusQuery, PgClient};
 use crate::prompts::Prompt;
 use log::{error, info};
@@ -48,6 +47,7 @@ impl Actor {
         //break statement mb
         loop {
             sleep(Duration::from_secs(5)).await;
+            info!("Actor is in progress...");
             // If reviewer is stuck for more than 1 minute, we run refresh
             let is_stuck = ProfileReviewer::is_reviewer_stuck(pg_client).await?;
             if is_stuck {

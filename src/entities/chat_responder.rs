@@ -1,5 +1,5 @@
 use crate::common::{BotError, ChatId};
-use crate::constants::{VINCHIK_CHAT, VINCHIK_CHAT_INT};
+use crate::constants::VINCHIK_CHAT_INT;
 use crate::entities::chat_meta::ChatMeta;
 use crate::entities::profile_reviewer::ProcessingStatus;
 use crate::entities::task::Task;
@@ -11,7 +11,7 @@ use crate::td::td_chats::td_get_chats;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
 use async_trait::async_trait;
-use log::error;
+use log::info;
 use tokio_postgres::Row;
 use uuid::Uuid;
 
@@ -106,13 +106,12 @@ impl ChatResponder {
     }
     pub async fn start(pg_client: &PgClient) -> Result<(), BotError> {
         let chats = ChatMeta::get_all_unread(pg_client).await?;
-        println!("CHATS {:?}", chats);
         for chat in chats {
             if *chat.chat_id() != VINCHIK_CHAT_INT {
                 let open_ai = OpenAI::new()?;
                 let prompt = Prompt::chat_responder(chat.last_message_text());
                 let response = open_ai.send_user_message(prompt.user).await?;
-                error!("OpenAI response: {response}");
+                info!("OpenAI response: {response}");
                 let chat_id_str = chat.chat_id().to_string();
                 let send_message = SendMessage::text_message(&response, &chat_id_str);
                 let message = serde_json::to_string(&send_message)?;

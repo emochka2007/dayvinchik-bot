@@ -7,22 +7,25 @@ use crate::pg::pg::{DbStatusQuery, PgClient};
 use crate::td::td_message::chat_history;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
-use dotenvy::var;
 use log::{debug, error, info};
 use rust_tdlib::types::{Chat, Chats, UpdateFile};
 use serde_json::Value;
 
-pub async fn parse_message(json_str: &str, pg_client: &PgClient) -> Result<(), BotError> {
+pub async fn parse_message(pg_client: &PgClient, json_str: &str) -> Result<(), BotError> {
     let json_value: Value = serde_json::from_str(json_str)?;
     debug!("Value: {:?}", json_value);
 
     let td_type = match json_value.get("@type").and_then(|v| v.as_str()) {
         Some(t) => t,
         None => {
-            info!("No @type field in the incoming JSON. Ignoring.");
+            error!("No @type field in the incoming JSON. Ignoring.");
             return Ok(());
         }
     };
+    if td_type == "error" {
+        error!("Error td_lib in read {:?}", json_str);
+        panic!("read.rs error");
+    }
 
     let response_key = match ResponseKeys::from_str(td_type) {
         Ok(rk) => rk,
@@ -33,11 +36,11 @@ pub async fn parse_message(json_str: &str, pg_client: &PgClient) -> Result<(), B
     };
 
     debug!("Td_type: {td_type}");
-    debug!("Key: {:?}", response_key);
+    info!("Response Key: {:?}", response_key);
 
     // This is your “last request” logic; adjust as needed.
     let last_tdlib_call = get_last_request()?;
-    debug!("Last tdlib call: {:?}", last_tdlib_call);
+    info!("Last tdlib call: {:?}", last_tdlib_call);
 
     // Attempt to find a “pending” Task that matches the last request + response
     let task = Task::match_by_req_res(pg_client, &last_tdlib_call, &response_key).await?;
