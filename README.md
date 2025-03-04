@@ -1,3 +1,5 @@
+# code refactor link
+https://medium.com/p/ad43be44d193
 ## Feature in progress
 
 - Learning tool to educate model
