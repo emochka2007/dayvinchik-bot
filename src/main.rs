@@ -68,14 +68,6 @@ async fn main() -> Result<(), BotError> {
         }
     });
 
-    if let Ok(client) = pool.get().await {
-        tokio::spawn(async move {
-            MatchAnalyzer::start(&client).await.unwrap_or_else(|e| {
-                error!("Match Analyzer {:?}", e);
-            });
-        });
-    }
-
     // todo wait for register -> change to func state checker
     // IF QR AUTH NEEDED
     // qr_auth_init(client_id);
@@ -112,16 +104,25 @@ async fn main() -> Result<(), BotError> {
 
     let build_env = env::var("BUILD")?;
     if build_env == "UNSTABLE" {
-        let client = pool.get().await?;
-        tokio::spawn(async move {
-            //todo move loop internally
-            loop {
-                ChatResponder::start(&client)
-                    .await
-                    .unwrap_or_else(|e| error!("Chat Responder start {:?}", e));
-                sleep(Duration::from_secs(30)).await;
-            }
-        });
+        if let Ok(client) = pool.get().await {
+            tokio::spawn(async move {
+                MatchAnalyzer::start(&client).await.unwrap_or_else(|e| {
+                    error!("Match Analyzer {:?}", e);
+                });
+            });
+        }
+
+        if let Ok(client) = pool.get().await {
+            tokio::spawn(async move {
+                //todo move loop internally
+                loop {
+                    ChatResponder::start(&client)
+                        .await
+                        .unwrap_or_else(|e| error!("Chat Responder start {:?}", e));
+                    sleep(Duration::from_secs(30)).await;
+                }
+            });
+        }
     }
 
     let mode = env::var("MODE")?;

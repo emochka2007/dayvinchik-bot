@@ -283,8 +283,7 @@ pub async fn td_read_one_from_message_id(
 ) -> Result<(), BotError> {
     let history_message = GetChatHistory::builder()
         .chat_id(chat_id)
-        //todo 0
-        .from_message_id(13981712384)
+        .from_message_id(0)
         .offset(0)
         .limit(offset)
         .build();
