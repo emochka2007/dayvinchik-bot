@@ -7,7 +7,6 @@ use crate::pg::pg::{DbStatusQuery, PgClient};
 use crate::td::td_message::chat_history;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
-use dotenvy::var;
 use log::{debug, error, info};
 use rust_tdlib::types::{Chat, Chats, UpdateFile};
 use serde_json::Value;

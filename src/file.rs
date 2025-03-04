@@ -2,7 +2,6 @@ use crate::common::StdResult;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use log::{debug, error};
-use std::ffi::OsString;
 use std::fs::{read_dir, File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};

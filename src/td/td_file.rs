@@ -4,7 +4,6 @@ use crate::pg::pg::PgClient;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
 use rust_tdlib::types::DownloadFile;
-use serde_json::Error;
 
 const PRIORITY: i32 = 16;
 const LIMIT: i32 = 1;

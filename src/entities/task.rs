@@ -6,7 +6,7 @@ use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
 use async_trait::async_trait;
 use deadpool_postgres::GenericClient;
-use log::{debug, info};
+use log::debug;
 use rust_tdlib::tdjson::ClientId;
 use std::io;
 use std::io::ErrorKind;

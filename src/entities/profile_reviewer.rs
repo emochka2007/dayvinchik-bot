@@ -16,6 +16,7 @@ use tokio_postgres::types::{FromSql, Type};
 use tokio_postgres::Row;
 use uuid::Uuid;
 
+const TIMEOUT: u64 = 180;
 #[derive(Debug)]
 pub enum ProcessingStatus {
     Waiting,
@@ -300,12 +301,31 @@ impl ProfileReviewer {
                     let updated_at: SystemTime = row.try_get("updated_at")?;
                     let now = SystemTime::now();
                     let time_passed = now.duration_since(updated_at).unwrap();
-                    info!("Time passed secs {:}", time_passed.as_secs());
-                    return Ok(time_passed > Duration::from_secs(180));
+                    info!(
+                        "Time passed secs since last non-processed profile_reviewer  {:}",
+                        time_passed.as_secs()
+                    );
+                    return Ok(time_passed > Duration::from_secs(TIMEOUT));
                 }
                 Ok(false)
             }
-            None => Ok(false),
+            None => {
+                let last_processed =
+                    ProfileReviewer::get_by_status_one(pg_client, ProcessingStatus::Processed)
+                        .await?;
+                match last_processed {
+                    Some(row) => {
+                        let now = SystemTime::now();
+                        let time_passed = now.duration_since(row.updated_at).unwrap();
+                        info!(
+                            "Time passed since last_processed profile_reviewer {:}",
+                            time_passed.as_secs()
+                        );
+                        Ok(time_passed > Duration::from_secs(TIMEOUT))
+                    }
+                    None => Ok(false),
+                }
+            }
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::common::{BotError, ChatId};
+use crate::common::BotError;
 use crate::constants::{VINCHIK_CHAT, VINCHIK_CHAT_INT};
 use crate::entities::chat_meta::{td_chat_info, td_open_chat, ChatMeta};
 use crate::entities::superlike::SuperLike;

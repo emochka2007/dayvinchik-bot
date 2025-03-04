@@ -21,7 +21,6 @@ use crate::common::{env_init, BotError, MessageId};
 use crate::cron::cron_manager;
 use crate::entities::actor::{Actor, ActorType};
 use crate::entities::chat_responder::ChatResponder;
-use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_reviewer::ProfileReviewer;
 use crate::helpers::input;
 use crate::input::match_input;
@@ -29,7 +28,6 @@ use crate::matches::MatchAnalyzer;
 use crate::pg::pg::PgConnect;
 use crate::td::init_tdlib_params;
 use crate::td::read::parse_message;
-use crate::td::td_chats::td_get_chats;
 use crate::td::td_json::{new_client, receive};
 use log::{debug, error, info};
 use std::env;
@@ -92,36 +90,39 @@ async fn main() -> Result<(), BotError> {
         .await
         .unwrap_or_else(|e| panic!("Couldn't get the client from pool {:?}", e));
 
-    // tokio::spawn(async move {
-    //     Actor::new(ActorType::Default, 50)
-    //         .analyze(&client)
-    //         .await
-    //         .unwrap_or_else(|e| {
-    //             error!("Actor analyze error {:?}", e);
-    //         });
-    // });
+    tokio::spawn(async move {
+        Actor::new(ActorType::Default, 50)
+            .analyze(&client)
+            .await
+            .unwrap_or_else(|e| {
+                error!("Actor analyze error {:?}", e);
+            });
+    });
 
-    // let client = pool.get().await?;
-    // tokio::spawn(async move {
-    //     //todo move loop internally
-    //     loop {
-    //         ProfileReviewer::start(&client)
-    //             .await
-    //             .unwrap_or_else(|e| error!("ProfileReviewer start {:?}", e));
-    //         sleep(Duration::from_secs(10)).await;
-    //     }
-    // });
+    let client = pool.get().await?;
+    tokio::spawn(async move {
+        //todo move loop internally
+        loop {
+            ProfileReviewer::start(&client)
+                .await
+                .unwrap_or_else(|e| error!("ProfileReviewer start {:?}", e));
+            sleep(Duration::from_secs(10)).await;
+        }
+    });
 
-    // let client = pool.get().await?;
-    // tokio::spawn(async move {
-    //     //todo move loop internally
-    //     loop {
-    //         ChatResponder::start(&client)
-    //             .await
-    //             .unwrap_or_else(|e| error!("Chat Responder start {:?}", e));
-    //         sleep(Duration::from_secs(30)).await;
-    //     }
-    // });
+    let build_env = env::var("BUILD")?;
+    if build_env == "UNSTABLE" {
+        let client = pool.get().await?;
+        tokio::spawn(async move {
+            //todo move loop internally
+            loop {
+                ChatResponder::start(&client)
+                    .await
+                    .unwrap_or_else(|e| error!("Chat Responder start {:?}", e));
+                sleep(Duration::from_secs(30)).await;
+            }
+        });
+    }
 
     let mode = env::var("MODE")?;
     if mode == "CRON" {

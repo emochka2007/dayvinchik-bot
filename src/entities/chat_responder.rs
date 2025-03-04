@@ -1,5 +1,5 @@
 use crate::common::{BotError, ChatId};
-use crate::constants::{VINCHIK_CHAT, VINCHIK_CHAT_INT};
+use crate::constants::VINCHIK_CHAT_INT;
 use crate::entities::chat_meta::ChatMeta;
 use crate::entities::profile_reviewer::ProcessingStatus;
 use crate::entities::task::Task;
@@ -11,7 +11,7 @@ use crate::td::td_chats::td_get_chats;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
 use async_trait::async_trait;
-use log::{error, info};
+use log::info;
 use tokio_postgres::Row;
 use uuid::Uuid;
 

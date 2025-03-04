@@ -1,7 +1,6 @@
 use crate::common::BotError;
 use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_reviewer::{ProcessingStatus, ProfileReviewer};
-use crate::entities::superlike::SuperLike;
 use crate::pg::pg::{DbQuery, DbStatusQuery, PgClient};
 use crate::prompts::Prompt;
 use log::{error, info};

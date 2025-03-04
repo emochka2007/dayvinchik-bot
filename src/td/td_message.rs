@@ -1,5 +1,4 @@
 use crate::common::{BotError, ChatId, FileId, MessageId};
-use crate::constants::PROCESSED_MESSAGE_IDS;
 use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_reviewer::{ProcessingStatus, ProfileReviewer};
 use crate::entities::superlike::SuperLike;
@@ -9,7 +8,7 @@ use crate::td::td_file::td_file_download;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
 use async_trait::async_trait;
-use log::{debug, error, info};
+use log::{debug, error};
 use rust_tdlib::types::{
     GetChatHistory, Message, MessageContent, Messages, TextEntity, TextEntityType,
 };
@@ -204,20 +203,11 @@ pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<(), B
     for message in messages.messages() {
         debug!("Message {:?}", message);
         if let Some(message) = message.as_ref() {
-            // let processed_messages = PROCESSED_MESSAGE_IDS.blocking_lock();
-            // if processed_messages.contains(&message.id()) {
-            //     info!("Message skipped {}", message.id());
-            //     continue;
-            // } else {
-            //     // Cache memory for skipping processed messages
-            //     PROCESSED_MESSAGE_IDS.blocking_lock().push(message.id());
-            // }
-
+            //todo separate func
             let parsed_message = MessageMeta::from_message(message)?;
             let block_phrases = [
                 "✨🔍",
                 "Так выглядит твоя анкета:",
-                "1",
                 "никита, 21",
                 "/start",
                 "unmatched",
@@ -228,7 +218,7 @@ pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<(), B
                 .iter()
                 .any(|phrase| parsed_message.text().contains(phrase));
 
-            if is_blocked || parsed_message.text().is_empty() {
+            if is_blocked {
                 error!("Skipping message {}", parsed_message.text());
                 continue;
             }
