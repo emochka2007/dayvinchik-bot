@@ -108,7 +108,7 @@ impl ChatResponder {
         let chats = ChatMeta::get_all_unread(pg_client).await?;
         for chat in chats {
             if *chat.chat_id() != VINCHIK_CHAT_INT {
-                let open_ai = OpenAI::new()?;
+                let open_ai = OpenAI::new("chat")?;
                 let prompt = Prompt::chat_responder(chat.last_message_text());
                 let response = open_ai.send_user_message(prompt.user).await?;
                 info!("OpenAI response: {response}");

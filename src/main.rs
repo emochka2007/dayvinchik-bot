@@ -22,12 +22,17 @@ use crate::common::{env_init, BotError, MessageId};
 use crate::cron::cron_manager;
 use crate::entities::actor::{Actor, ActorType};
 use crate::entities::chat_responder::ChatResponder;
-use crate::entities::image_embeddings::{get_and_store_embedding, get_score, ImageEmbeddings};
+use crate::entities::image_embeddings::{
+    get_and_store_embedding, get_score_of_image, ImageEmbeddings,
+};
 use crate::entities::profile_reviewer::ProfileReviewer;
+use crate::file::{image_to_base64, new_base64};
 use crate::helpers::input;
 use crate::input::match_input;
 use crate::matches::MatchAnalyzer;
+use crate::openapi::llm_api::OpenAI;
 use crate::pg::pg::{DbQuery, PgConnect};
+use crate::prompts::Prompt;
 use crate::td::init_tdlib_params;
 use crate::td::read::parse_message;
 use crate::td::td_json::{new_client, receive};
@@ -50,15 +55,19 @@ async fn main() -> Result<(), BotError> {
 
     match dotenvy::var("EDU") {
         Ok(_value) => {
-            get_score(
-                &client,
-                "./reviewed_images/445752c1-ff8a-4432-91ef-13cc72a445d0.png",
-            )
-            .await
-            .unwrap();
-            // get_and_store_embedding(&client).await.unwrap_or_else(|e| {
-            //     error!("Error in get_and_store_embedding {:?}", e);
-            // });
+            let chat_ai = OpenAI::new("chat/").unwrap();
+            let analyze_prompt = Prompt::llava_image();
+            let image_64 = new_base64("reviewed_images/40dc60f5-7d77-4a29-b5d7-942f1966a8fa.png");
+            let description = chat_ai
+                .send_image_with_prompt(analyze_prompt.clone(), analyze_prompt, image_64)
+                .await
+                .unwrap();
+            let open_ai = OpenAI::new("embeddings/").unwrap();
+            open_ai.embeddings(&description).await.unwrap();
+            // ImageEmbeddings::get_score_of_prompt(&client, "emo girl with piercings").await?;
+            get_and_store_embedding(&client).await.unwrap_or_else(|e| {
+                error!("Error in get_and_store_embedding {:?}", e);
+            });
         }
         Err(e) => {
             debug!("EDU var is not set {:?}", e);

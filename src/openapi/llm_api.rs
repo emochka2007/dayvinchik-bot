@@ -1,6 +1,6 @@
 use crate::common::BotError;
 use crate::file::image_to_base64;
-use crate::openapi::openai::ChatCompletionResponse;
+use crate::openapi::openai::{ChatCompletionResponse, EmbeddingResponse};
 use reqwest::Client;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
@@ -13,9 +13,9 @@ pub struct OpenAI {
     base_url: String,
 }
 impl OpenAI {
-    pub fn new() -> Result<Self, BotError> {
+    pub fn new(endpoint: &str) -> Result<Self, BotError> {
         let client = Client::new();
-        let base_url = "https://api.openai.com/v1/chat/".to_string();
+        let base_url = format!("https://api.openai.com/v1/{}", endpoint);
         Ok(Self {
             key: env::var("OPEN_API_KEY")?,
             client,
@@ -24,6 +24,19 @@ impl OpenAI {
     }
 
     async fn post<T: DeserializeOwned>(&self, body: Value) -> Result<T, BotError> {
+        let response = self
+            .client
+            .post(format!("{}completions", self.base_url))
+            .header("Content-Type", "application/json")
+            .header("Authorization", format!("Bearer {}", self.key))
+            .json(&body)
+            .send()
+            .await?;
+        println!("{:?}", response);
+        // Ok(response.json::<T>().await?)
+        /**
+        Override here, we need to send not only completions but also embeddings and chat
+        */
         let response = self
             .client
             .post(format!("{}completions", self.base_url))
@@ -53,6 +66,41 @@ impl OpenAI {
         let response = self.post::<ChatCompletionResponse>(body).await?;
         Self::parse_choice(&response)
     }
+    pub async fn send_image_with_prompt(
+        &self,
+        sys_message: String,
+        user_message: String,
+        image: String,
+    ) -> Result<String, BotError> {
+        let base64img = format!("data:image/png;base64,{}", image);
+        let body = json!({
+            "model": "gpt-4o",
+            "store": true,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": sys_message
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": user_message
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": base64img
+                            }
+                        }
+                    ]
+                }
+            ]
+        });
+        let response = self.post::<ChatCompletionResponse>(body).await?;
+        Self::parse_choice(&response)
+    }
 
     pub async fn _send_sys_message(
         &self,
@@ -70,7 +118,7 @@ impl OpenAI {
         let response = self.post::<ChatCompletionResponse>(body).await?;
         Self::parse_choice(&response)
     }
-    pub async fn send_sys_image_message(
+    pub async fn send_image_with_ref_image(
         &self,
         sys_message: String,
         user_message: String,
@@ -115,5 +163,15 @@ impl OpenAI {
         });
         let response = self.post::<ChatCompletionResponse>(body).await?;
         Self::parse_choice(&response)
+    }
+    pub async fn embeddings(&self, image_description: &str) -> Result<(), BotError> {
+        //todo check for self.client endpoint
+        let body = json!({
+        "model": "text-embedding-3-small",
+        "input": image_description,
+        });
+        let response = self.post::<EmbeddingResponse>(body).await?;
+        // Self::parse_choice(&response)
+        Ok(())
     }
 }

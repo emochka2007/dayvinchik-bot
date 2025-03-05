@@ -44,3 +44,22 @@ struct TokenDetails {
     accepted_prediction_tokens: Option<i32>,
     rejected_prediction_tokens: Option<i32>,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EmbeddingResponse {
+    object: String,
+    data: Vec<EmbeddingData>,
+    model: String,
+    usage: EmbeddingUsage,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EmbeddingData {
+    object: String,
+    index: i32,
+    embedding: Vec<i32>,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EmbeddingUsage {
+    prompt_tokens: i32,
+    total_tokens: i32,
+}

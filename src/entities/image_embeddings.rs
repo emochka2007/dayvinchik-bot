@@ -1,6 +1,6 @@
 use crate::common::BotError;
 use crate::embeddings::ollama::OllamaVision;
-use crate::file::image_to_base64;
+use crate::file::{image_to_base64, new_base64};
 use crate::pg::pg::{DbQuery, PgClient};
 use async_trait::async_trait;
 use log::info;
@@ -61,9 +61,9 @@ impl ImageEmbeddings {
         let paths = fs::read_dir("./reviewed_images")?;
         for file in paths {
             let file_name = file?.path();
-            let popusk_base64 = image_to_base64(file_name.to_str().unwrap())?;
+            let image_encoded = new_base64(file_name.to_str().unwrap());
             let ollama_vision = OllamaVision::new();
-            let description = ollama_vision.describe_image(popusk_base64).await?;
+            let description = ollama_vision.describe_image(image_encoded).await?;
             let vector = ollama_vision
                 .get_image_embedding(description.as_str())
                 .await?;
@@ -76,12 +76,24 @@ impl ImageEmbeddings {
         }
         Ok(())
     }
+    // get score based on description "emo_girl"
+    pub async fn get_score_of_prompt(pg_client: &PgClient, prompt: &str) -> Result<i16, BotError> {
+        let ollama_vision = OllamaVision::new();
+        let vector = ollama_vision.get_image_embedding(prompt).await?;
+        let query = "SELECT * FROM image_embeddings ORDER BY embedding <-> $1 LIMIT 5;";
+        let rows = pg_client.query(query, &[&vector]).await?;
+        for row in rows {
+            let path: &str = row.try_get("image_path").unwrap();
+            info!("{:?}", path);
+        }
+        Ok(1)
+    }
 }
 pub async fn get_and_store_embedding(pg_client: &PgClient) -> Result<(), BotError> {
     ImageEmbeddings::pick_and_store_reviewed_images(pg_client).await?;
     Ok(())
 }
-pub async fn get_score(pg_client: &PgClient, path: &str) -> Result<i16, BotError> {
+pub async fn get_score_of_image(pg_client: &PgClient, path: &str) -> Result<i16, BotError> {
     let embedding = ImageEmbeddings::get_by_path(pg_client, path.to_string())
         .await?
         .unwrap();

@@ -243,13 +243,13 @@ impl ProfileReviewer {
         profile_reviewer
             .update_status(pg_client, ProcessingStatus::Pending)
             .await?;
-        let open_ai = OpenAI::new()?;
+        let open_ai = OpenAI::new("chat")?;
         let prompt = Prompt::analyze_alt();
         let file_id = profile_reviewer.main_file().unwrap();
         let main_file = format!("profile_images/{file_id}.png");
         let base64_image = get_image_with_retries(&main_file).await?;
         if let Ok(response) = open_ai
-            .send_sys_image_message(prompt.system.unwrap(), prompt.user, base64_image)
+            .send_image_with_ref_image(prompt.system.unwrap(), prompt.user, base64_image)
             .await
         {
             info!("OpenAI response: {response}");
