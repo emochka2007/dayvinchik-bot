@@ -2,7 +2,7 @@ use crate::common::BotError;
 use crate::entities::dv_bot::DvBot;
 use crate::entities::task::Task;
 use crate::file::{file_exists, get_image_with_retries, move_file};
-use crate::openapi::llm_api::OpenAI;
+use crate::openapi::llm_api::{OpenAI, OpenAIType};
 use crate::pg::pg::{DbQuery, DbStatusQuery, PgClient};
 use crate::prompts::Prompt;
 use crate::td::td_file::td_file_download;
@@ -243,7 +243,7 @@ impl ProfileReviewer {
         profile_reviewer
             .update_status(pg_client, ProcessingStatus::Pending)
             .await?;
-        let open_ai = OpenAI::new("chat")?;
+        let open_ai = OpenAI::new(OpenAIType::Chat)?;
         let prompt = Prompt::analyze_alt();
         let file_id = profile_reviewer.main_file().unwrap();
         let main_file = format!("profile_images/{file_id}.png");

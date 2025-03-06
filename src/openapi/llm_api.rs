@@ -12,34 +12,45 @@ pub struct OpenAI {
     client: Client,
     base_url: String,
 }
+pub enum OpenAIType {
+    Chat,
+    Embedding,
+}
 impl OpenAI {
-    pub fn new(endpoint: &str) -> Result<Self, BotError> {
+    pub fn new(open_ai_type: OpenAIType) -> Result<Self, BotError> {
         let client = Client::new();
-        let base_url = format!("https://api.openai.com/v1/{}", endpoint);
+        let base_url: &str;
+        match open_ai_type {
+            OpenAIType::Chat => {
+                base_url = "https://api.openai.com/v1/chat/completions";
+            }
+            OpenAIType::Embedding => {
+                base_url = "https://api.openai.com/v1/embeddings";
+            }
+        }
         Ok(Self {
             key: env::var("OPEN_API_KEY")?,
             client,
-            base_url,
+            base_url: base_url.to_string(),
         })
     }
 
     async fn post<T: DeserializeOwned>(&self, body: Value) -> Result<T, BotError> {
+        // let response = self
+        //     .client
+        //     .post(&self.base_url)
+        //     .header("Content-Type", "application/json")
+        //     .header("Authorization", format!("Bearer {}", self.key))
+        //     .json(&body)
+        //     .send()
+        //     .await?;
+        // println!("{:?}", response.text().await.unwrap());
+        // /**
+        // Override here, we need to send not only completions but also embeddings and chat
+        // */
         let response = self
             .client
-            .post(format!("{}completions", self.base_url))
-            .header("Content-Type", "application/json")
-            .header("Authorization", format!("Bearer {}", self.key))
-            .json(&body)
-            .send()
-            .await?;
-        println!("{:?}", response);
-        // Ok(response.json::<T>().await?)
-        /**
-        Override here, we need to send not only completions but also embeddings and chat
-        */
-        let response = self
-            .client
-            .post(format!("{}completions", self.base_url))
+            .post(&self.base_url)
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", self.key))
             .json(&body)
@@ -68,8 +79,7 @@ impl OpenAI {
     }
     pub async fn send_image_with_prompt(
         &self,
-        sys_message: String,
-        user_message: String,
+        user_message: &str,
         image: String,
     ) -> Result<String, BotError> {
         let base64img = format!("data:image/png;base64,{}", image);
@@ -77,10 +87,6 @@ impl OpenAI {
             "model": "gpt-4o",
             "store": true,
             "messages": [
-                {
-                    "role": "system",
-                    "content": sys_message
-                },
                 {
                     "role": "user",
                     "content": [
@@ -164,14 +170,13 @@ impl OpenAI {
         let response = self.post::<ChatCompletionResponse>(body).await?;
         Self::parse_choice(&response)
     }
-    pub async fn embeddings(&self, image_description: &str) -> Result<(), BotError> {
+    pub async fn embeddings(&self, image_description: &str) -> Result<EmbeddingResponse, BotError> {
         //todo check for self.client endpoint
         let body = json!({
         "model": "text-embedding-3-small",
         "input": image_description,
         });
         let response = self.post::<EmbeddingResponse>(body).await?;
-        // Self::parse_choice(&response)
-        Ok(())
+        Ok(response)
     }
 }

@@ -22,15 +22,13 @@ use crate::common::{env_init, BotError, MessageId};
 use crate::cron::cron_manager;
 use crate::entities::actor::{Actor, ActorType};
 use crate::entities::chat_responder::ChatResponder;
-use crate::entities::image_embeddings::{
-    get_and_store_embedding, get_score_of_image, ImageEmbeddings,
-};
+use crate::entities::image_embeddings::{get_score_of_image, ImageEmbeddings};
 use crate::entities::profile_reviewer::ProfileReviewer;
 use crate::file::{image_to_base64, new_base64};
 use crate::helpers::input;
 use crate::input::match_input;
 use crate::matches::MatchAnalyzer;
-use crate::openapi::llm_api::OpenAI;
+use crate::openapi::llm_api::{OpenAI, OpenAIType};
 use crate::pg::pg::{DbQuery, PgConnect};
 use crate::prompts::Prompt;
 use crate::td::init_tdlib_params;
@@ -53,21 +51,14 @@ async fn main() -> Result<(), BotError> {
     PgConnect::run_migrations(&client).await?;
     PgConnect::clean_db(&client).await?;
 
+    // Store the vectors for reviewed images
     match dotenvy::var("EDU") {
         Ok(_value) => {
-            let chat_ai = OpenAI::new("chat/").unwrap();
-            let analyze_prompt = Prompt::llava_image();
-            let image_64 = new_base64("reviewed_images/40dc60f5-7d77-4a29-b5d7-942f1966a8fa.png");
-            let description = chat_ai
-                .send_image_with_prompt(analyze_prompt.clone(), analyze_prompt, image_64)
+            let prompt = "The emo girl style is a distinctive and expressive look that blends dark aesthetics with a touch of punk and alternative influences. It’s not just about clothing—it’s an overall attitude that reflects emotion, individuality, and sometimes a hint of vulnerability. Here’s a comprehensive breakdown of the key elements:";
+            ImageEmbeddings::get_score_of_prompt(&client, prompt).await?;
+            ImageEmbeddings::pick_and_store_reviewed_images(&client)
                 .await
                 .unwrap();
-            let open_ai = OpenAI::new("embeddings/").unwrap();
-            open_ai.embeddings(&description).await.unwrap();
-            // ImageEmbeddings::get_score_of_prompt(&client, "emo girl with piercings").await?;
-            get_and_store_embedding(&client).await.unwrap_or_else(|e| {
-                error!("Error in get_and_store_embedding {:?}", e);
-            });
         }
         Err(e) => {
             debug!("EDU var is not set {:?}", e);

@@ -33,7 +33,7 @@ impl OllamaVision {
     }
 
     pub async fn describe_image(&self, bs64image: String) -> Result<String, BotError> {
-        let prompt = Prompt::llava_image();
+        let prompt = Prompt::image_description();
         let image = Image::from_base64(bs64image);
         let request = GenerationRequest::new(self.model.to_string(), prompt).add_image(image);
         let res = self.ollama.generate(request).await?;
