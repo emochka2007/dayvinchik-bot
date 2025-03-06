@@ -93,12 +93,12 @@ impl ImageEmbeddings {
     // get score based on description "emo_girl"
     pub async fn get_score_of_prompt(pg_client: &PgClient, prompt: &str) -> Result<i16, BotError> {
         let embedding_ai = OpenAI::new(OpenAIType::Embedding)?;
-        let response = embedding_ai.embeddings(prompt).await.unwrap();
+        let response = embedding_ai.embeddings(prompt).await?;
         let query = "SELECT * FROM image_embeddings ORDER BY embedding <-> $1 LIMIT 5;";
         let vector = Vector::from(response.data.first().unwrap().embedding.clone());
         let rows = pg_client.query(query, &[&vector]).await?;
         for row in rows {
-            let path: &str = row.try_get("image_path").unwrap();
+            let path: &str = row.try_get("image_path")?;
             info!("{:?}", path);
         }
         Ok(1)

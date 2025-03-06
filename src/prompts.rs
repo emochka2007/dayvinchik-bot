@@ -77,3 +77,4 @@ Overall Impression: Provide a comprehensive description that ties together physi
         prompt.to_string()
     }
 }
+pub const EMO_GIRL_DESCRIPTION: &str = "The emo girl style is a distinctive and expressive look that blends dark aesthetics with a touch of punk and alternative influences. It’s not just about clothing—it’s an overall attitude that reflects emotion, individuality, and sometimes a hint of vulnerability. Here’s a comprehensive breakdown of the key elements:";

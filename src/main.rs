@@ -22,15 +22,12 @@ use crate::common::{env_init, BotError, MessageId};
 use crate::cron::cron_manager;
 use crate::entities::actor::{Actor, ActorType};
 use crate::entities::chat_responder::ChatResponder;
-use crate::entities::image_embeddings::{get_score_of_image, ImageEmbeddings};
+use crate::entities::image_embeddings::ImageEmbeddings;
 use crate::entities::profile_reviewer::ProfileReviewer;
-use crate::file::{image_to_base64, new_base64};
 use crate::helpers::input;
 use crate::input::match_input;
 use crate::matches::MatchAnalyzer;
-use crate::openapi::llm_api::{OpenAI, OpenAIType};
-use crate::pg::pg::{DbQuery, PgConnect};
-use crate::prompts::Prompt;
+use crate::pg::pg::PgConnect;
 use crate::td::init_tdlib_params;
 use crate::td::read::parse_message;
 use crate::td::td_json::{new_client, receive};
@@ -54,17 +51,14 @@ async fn main() -> Result<(), BotError> {
     // Store the vectors for reviewed images
     match dotenvy::var("EDU") {
         Ok(_value) => {
-            let prompt = "The emo girl style is a distinctive and expressive look that blends dark aesthetics with a touch of punk and alternative influences. It’s not just about clothing—it’s an overall attitude that reflects emotion, individuality, and sometimes a hint of vulnerability. Here’s a comprehensive breakdown of the key elements:";
-            ImageEmbeddings::get_score_of_prompt(&client, prompt).await?;
-            ImageEmbeddings::pick_and_store_reviewed_images(&client)
-                .await
-                .unwrap();
+            // Get prompt score example
+            // ImageEmbeddings::get_score_of_prompt(&client, EMO_GIRL_DESCRIPTION).await?;
+            ImageEmbeddings::pick_and_store_reviewed_images(&client).await?;
         }
         Err(e) => {
             debug!("EDU var is not set {:?}", e);
         }
     }
-    return Ok(());
 
     tokio::spawn(async move {
         loop {
