@@ -4,7 +4,7 @@ use crate::entities::task::Task;
 use async_trait::async_trait;
 use deadpool_postgres::{Config, Manager, ManagerConfig, Pool, RecyclingMethod, Runtime};
 use log::info;
-use std::env;
+use std::{env, fs};
 use tokio_postgres::{Client, NoTls, Row};
 use uuid::Uuid;
 
@@ -102,10 +102,10 @@ impl PgConnect {
     }
 
     pub async fn run_migrations(client: &Client) -> Result<(), BotError> {
-        // todo get dynamically from folder
-        let migration_files = vec!["migrations/init.sql"];
-        for file in migration_files {
-            let sql = std::fs::read_to_string(file)?;
+        let paths = fs::read_dir("./migrations").unwrap();
+        for file in paths {
+            let file_name = file?.path();
+            let sql = std::fs::read_to_string(file_name)?;
             client.batch_execute(&sql).await?;
             info!("Executed migration {sql}");
         }

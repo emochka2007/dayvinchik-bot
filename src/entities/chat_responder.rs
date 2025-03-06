@@ -5,6 +5,7 @@ use crate::entities::profile_reviewer::ProcessingStatus;
 use crate::entities::task::Task;
 use crate::messages::message::SendMessage;
 use crate::openapi::llm_api::OpenAI;
+use crate::openapi::llm_api::OpenAIType::Chat;
 use crate::pg::pg::{DbQuery, DbStatusQuery, PgClient};
 use crate::prompts::Prompt;
 use crate::td::td_chats::td_get_chats;
@@ -108,7 +109,7 @@ impl ChatResponder {
         let chats = ChatMeta::get_all_unread(pg_client).await?;
         for chat in chats {
             if *chat.chat_id() != VINCHIK_CHAT_INT {
-                let open_ai = OpenAI::new()?;
+                let open_ai = OpenAI::new(Chat)?;
                 let prompt = Prompt::chat_responder(chat.last_message_text());
                 let response = open_ai.send_user_message(prompt.user).await?;
                 info!("OpenAI response: {response}");

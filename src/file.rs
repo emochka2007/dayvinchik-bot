@@ -1,9 +1,13 @@
 use crate::common::StdResult;
+use base64::engine::general_purpose::STANDARD;
 use base64::prelude::BASE64_STANDARD;
+use base64::write::EncoderWriter;
 use base64::Engine;
+use image::ImageDecoder;
+use image::{DynamicImage, ImageFormat, ImageReader};
 use log::{debug, error};
 use std::fs::{read_dir, File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::{env, fs, io};
@@ -85,6 +89,18 @@ pub async fn get_image_with_retries(path_to_img: &str) -> io::Result<String> {
     };
     Ok(base64_image)
 }
+
+pub fn new_base64(path: &str) -> String {
+    let mut buffer = Vec::new();
+    let mut input = File::open(path).unwrap();
+    {
+        let mut encoder = EncoderWriter::new(&mut buffer, &STANDARD);
+        io::copy(&mut input, &mut encoder).unwrap();
+        encoder.finish().unwrap();
+    }
+    String::from_utf8(buffer).unwrap()
+}
+
 pub fn image_to_base64(path: &str) -> io::Result<String> {
     let mut file = File::open(path)?;
     let mut buffer = Vec::new();

@@ -1,3 +1,4 @@
+use pgvector::Vector;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -43,4 +44,23 @@ struct TokenDetails {
     reasoning_tokens: Option<i32>,
     accepted_prediction_tokens: Option<i32>,
     rejected_prediction_tokens: Option<i32>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EmbeddingResponse {
+    object: String,
+    pub data: Vec<EmbeddingData>,
+    model: String,
+    usage: EmbeddingUsage,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EmbeddingData {
+    object: String,
+    index: i32,
+    pub embedding: Vec<f32>,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EmbeddingUsage {
+    prompt_tokens: i32,
+    total_tokens: i32,
 }

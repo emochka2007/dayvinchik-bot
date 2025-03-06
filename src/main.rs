@@ -16,11 +16,13 @@ mod pg;
 mod prompts;
 mod start_phrases;
 mod td;
+mod viuer;
 
 use crate::common::{env_init, BotError, MessageId};
 use crate::cron::cron_manager;
 use crate::entities::actor::{Actor, ActorType};
 use crate::entities::chat_responder::ChatResponder;
+use crate::entities::image_embeddings::ImageEmbeddings;
 use crate::entities::profile_reviewer::ProfileReviewer;
 use crate::helpers::input;
 use crate::input::match_input;
@@ -42,13 +44,23 @@ async fn main() -> Result<(), BotError> {
     init_tdlib_params(client_id);
 
     let pool = PgConnect::create_pool_from_env()?;
-
     let client = pool.get().await?;
     PgConnect::run_migrations(&client).await?;
     PgConnect::clean_db(&client).await?;
 
+    // Store the vectors for reviewed images
+    match dotenvy::var("EDU") {
+        Ok(_value) => {
+            // Get prompt score example
+            // ImageEmbeddings::get_score_of_prompt(&client, EMO_GIRL_DESCRIPTION).await?;
+            ImageEmbeddings::pick_and_store_reviewed_images(&client).await?;
+        }
+        Err(e) => {
+            debug!("EDU var is not set {:?}", e);
+        }
+    }
+
     tokio::spawn(async move {
-        let processed_images: Vec<MessageId> = Vec::new();
         loop {
             let msg = tokio::task::spawn_blocking(|| {
                 receive(1.5) // td_receive

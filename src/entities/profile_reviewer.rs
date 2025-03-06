@@ -2,7 +2,7 @@ use crate::common::BotError;
 use crate::entities::dv_bot::DvBot;
 use crate::entities::task::Task;
 use crate::file::{file_exists, get_image_with_retries, move_file};
-use crate::openapi::llm_api::OpenAI;
+use crate::openapi::llm_api::{OpenAI, OpenAIType};
 use crate::pg::pg::{DbQuery, DbStatusQuery, PgClient};
 use crate::prompts::Prompt;
 use crate::td::td_file::td_file_download;
@@ -243,24 +243,31 @@ impl ProfileReviewer {
         profile_reviewer
             .update_status(pg_client, ProcessingStatus::Pending)
             .await?;
-        let open_ai = OpenAI::new()?;
+        let open_ai = OpenAI::new(OpenAIType::Chat)?;
         let prompt = Prompt::analyze_alt();
         let file_id = profile_reviewer.main_file().unwrap();
         let main_file = format!("profile_images/{file_id}.png");
         let base64_image = get_image_with_retries(&main_file).await?;
         if let Ok(response) = open_ai
-            .send_sys_image_message(prompt.system.unwrap(), prompt.user, base64_image)
+            .send_image_with_ref_image(prompt.system.unwrap(), prompt.user, base64_image)
             .await
         {
             info!("OpenAI response: {response}");
             //todo regex
-            let score = response.trim().parse::<i32>()?;
-            profile_reviewer.finalize(pg_client, score).await?;
-            let reviewed_file = format!("reviewed_images/{}.png", profile_reviewer.id());
-            move_file(&main_file, &reviewed_file)?;
+            if let Ok(score) = response.trim().parse::<i32>() {
+                profile_reviewer.finalize(pg_client, score).await?;
+                let reviewed_file = format!("reviewed_images/{}.png", profile_reviewer.id());
+                move_file(&main_file, &reviewed_file)?;
+            } else {
+                error!("Couldn't parse the OpenAI response {response}");
+                DvBot::send_dislike(pg_client).await?;
+            }
         } else {
-            error!("Couldn't parse the OpenAI response");
+            error!("Could not parse the open_ai response");
             DvBot::send_dislike(pg_client).await?;
+            profile_reviewer
+                .update_status(pg_client, ProcessingStatus::Failed)
+                .await?;
         }
         Ok(())
     }

@@ -2,6 +2,7 @@
 https://medium.com/p/ad43be44d193
 ## Feature in progress
 
+- Слишком много ❤️ за сегодня. stop bot
 - Learning tool to educate model
 
 ## Altushka Bot
