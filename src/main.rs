@@ -1,5 +1,6 @@
 #![feature(error_generic_member_access)]
 mod auth;
+mod cli;
 mod common;
 mod constants;
 mod cron;
@@ -48,6 +49,7 @@ async fn main() -> Result<(), BotError> {
     PgConnect::run_migrations(&client).await?;
     PgConnect::clean_db(&client).await?;
 
+    // Runs cli tool to which photos should be moved to saved_images
     // Store the vectors for reviewed images
     match dotenvy::var("EDU") {
         Ok(_value) => {

@@ -67,7 +67,7 @@ impl ImageEmbeddings {
         Ok(())
     }
     pub async fn pick_and_store_reviewed_images(pg_client: &PgClient) -> Result<(), BotError> {
-        let paths = fs::read_dir("./alt_images")?;
+        let paths = fs::read_dir("./saved_images")?;
         let chat_ai = OpenAI::new(OpenAIType::Chat)?;
         let embedding_ai = OpenAI::new(OpenAIType::Embedding)?;
         let prompt = Prompt::image_description();
