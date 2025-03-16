@@ -48,18 +48,6 @@ async fn main() -> Result<(), BotError> {
     PgConnect::run_migrations(&client).await?;
     PgConnect::clean_db(&client).await?;
 
-    // Store the vectors for reviewed images
-    match dotenvy::var("EDU") {
-        Ok(_value) => {
-            // Get prompt score example
-            // ImageEmbeddings::get_score_of_prompt(&client, EMO_GIRL_DESCRIPTION).await?;
-            ImageEmbeddings::pick_and_store_reviewed_images(&client).await?;
-        }
-        Err(e) => {
-            debug!("EDU var is not set {:?}", e);
-        }
-    }
-
     tokio::spawn(async move {
         loop {
             let msg = tokio::task::spawn_blocking(|| {
@@ -123,6 +111,19 @@ async fn main() -> Result<(), BotError> {
                 });
             });
         }
+        if let Ok(client) = pool.get().await {
+            // Store the vectors for reviewed images
+            match dotenvy::var("EDU") {
+                Ok(_value) => {
+                    // Get prompt score example
+                    // ImageEmbeddings::get_score_of_prompt(&client, EMO_GIRL_DESCRIPTION).await?;
+                    ImageEmbeddings::pick_and_store_reviewed_images(&client).await?;
+                }
+                Err(e) => {
+                    debug!("EDU var is not set {:?}", e);
+                }
+            }
+        }
 
         if let Ok(client) = pool.get().await {
             tokio::spawn(async move {
@@ -136,7 +137,6 @@ async fn main() -> Result<(), BotError> {
             });
         }
     }
-
     let mode = env::var("MODE")?;
     if mode == "CRON" {
     } else {
