@@ -1,17 +1,18 @@
-use crate::common::BotError;
 use crate::constants::get_last_request;
 use crate::entities::chat_meta::{get_chat, td_chat_info};
 use crate::entities::task::{Task, TaskStatus};
 use crate::file::move_file;
+use crate::helpers::{auth_tdlib, generate_qr_code};
 use crate::pg::pg::{DbStatusQuery, PgClient};
 use crate::td::td_message::chat_history;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
+use anyhow::Result;
 use log::{debug, error, info};
 use rust_tdlib::types::{Chat, Chats, UpdateFile};
 use serde_json::Value;
 
-pub async fn parse_message(pg_client: &PgClient, json_str: &str) -> Result<(), BotError> {
+pub async fn parse_message(pg_client: &PgClient, json_str: &str) -> Result<()> {
     let json_value: Value = serde_json::from_str(json_str)?;
     debug!("Value: {:?}", json_value);
 
@@ -24,7 +25,17 @@ pub async fn parse_message(pg_client: &PgClient, json_str: &str) -> Result<(), B
     };
     if td_type == "error" {
         error!("Error td_lib in read {:?}", json_str);
-        panic!("read.rs error");
+        return Ok(());
+    }
+
+    // Uncomment this code in case of 400 error
+    if td_type == "updateAuthorizationState" {
+        error!(
+            "Use the link from logs to login, your auth is not setup maybe {}",
+            json_str
+        );
+        auth_tdlib(json_str)?;
+        // panic!("Check for qr_code in folder -> connect the device in your app");
     }
 
     let response_key = match ResponseKeys::from_str(td_type) {

@@ -1,6 +1,6 @@
-use crate::common::BotError;
 use crate::entities::profile_reviewer::ProfileReviewer;
 use crate::entities::task::Task;
+use anyhow::Result;
 use async_trait::async_trait;
 use deadpool_postgres::{Config, Manager, ManagerConfig, Pool, RecyclingMethod, Runtime};
 use log::info;
@@ -37,13 +37,13 @@ impl PgConnect {
         self
     }
 
-    pub fn port(&mut self, port: String) -> Result<&mut Self, BotError> {
+    pub fn port(&mut self, port: String) -> Result<&mut Self> {
         let port: u16 = port.parse()?;
         self.port = port;
         Ok(self)
     }
 
-    pub async fn connect(&self) -> Result<Client, BotError> {
+    pub async fn connect(&self) -> Result<Client> {
         let conn_str = format!(
             "host={} user={} password={} dbname={} port={}",
             self.host, self.user, self.password, self.dbname, self.port
@@ -79,7 +79,7 @@ impl PgConnect {
             .expect("Failed to create pool")
     }
 
-    pub fn from_env() -> Result<Self, BotError> {
+    pub fn from_env() -> Result<Self> {
         let mut pg = Self {
             dbname: env::var("PG_DB")?,
             password: env::var("PG_PASS")?,
@@ -92,16 +92,16 @@ impl PgConnect {
         Ok(pg)
     }
 
-    pub async fn connect_pg_from_env() -> Result<Client, BotError> {
+    pub async fn connect_pg_from_env() -> Result<Client> {
         let pg = Self::from_env()?;
         pg.connect().await
     }
-    pub fn create_pool_from_env() -> Result<Pool, BotError> {
+    pub fn create_pool_from_env() -> Result<Pool> {
         let pool = Self::from_env()?;
         Ok(pool.create_pool())
     }
 
-    pub async fn run_migrations(client: &Client) -> Result<(), BotError> {
+    pub async fn run_migrations(client: &Client) -> Result<()> {
         let paths = fs::read_dir("./migrations").unwrap();
         for file in paths {
             let file_name = file?.path();
@@ -111,7 +111,7 @@ impl PgConnect {
         }
         Ok(())
     }
-    pub async fn clean_db(pg_client: &PgClient) -> Result<(), BotError> {
+    pub async fn clean_db(pg_client: &PgClient) -> Result<()> {
         ProfileReviewer::clean_up(pg_client).await?;
         Task::clean_up(pg_client).await?;
         Ok(())
@@ -121,8 +121,8 @@ impl PgConnect {
 #[async_trait]
 pub trait DbQuery {
     const DB_NAME: &'static str = "";
-    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<(), BotError>;
-    async fn select_by_id(pg_client: &PgClient, id: Uuid) -> Result<Option<Self>, BotError>
+    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<()>;
+    async fn select_by_id(pg_client: &PgClient, id: Uuid) -> Result<Option<Self>>
     where
         Self: Sized,
     {
@@ -136,11 +136,11 @@ pub trait DbQuery {
             None => Ok(None),
         }
     }
-    fn from_sql(row: Row) -> Result<Self, BotError>
+    fn from_sql(row: Row) -> Result<Self>
     where
         Self: Sized;
     // optional
-    async fn clean_up(_pg_client: &PgClient) -> Result<(), BotError> {
+    async fn clean_up(_pg_client: &PgClient) -> Result<()> {
         unimplemented!();
     }
 }
@@ -151,11 +151,8 @@ pub trait DbStatusQuery {
         &'a self,
         pg_client: &'a PgClient,
         status: Self::Status,
-    ) -> Result<(), BotError>;
-    async fn get_by_status_one(
-        pg_client: &PgClient,
-        status: Self::Status,
-    ) -> Result<Option<Self>, BotError>
+    ) -> Result<()>;
+    async fn get_by_status_one(pg_client: &PgClient, status: Self::Status) -> Result<Option<Self>>
     where
         Self: Sized;
 }

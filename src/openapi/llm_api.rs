@@ -1,6 +1,7 @@
-use crate::common::BotError;
 use crate::file::image_to_base64;
 use crate::openapi::openai::{ChatCompletionResponse, EmbeddingResponse};
+use crate::vault::vault_kv;
+use anyhow::Result;
 use reqwest::Client;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
@@ -17,7 +18,7 @@ pub enum OpenAIType {
     Embedding,
 }
 impl OpenAI {
-    pub fn new(open_ai_type: OpenAIType) -> Result<Self, BotError> {
+    pub fn new(open_ai_type: OpenAIType) -> Result<Self> {
         let client = Client::new();
         let base_url: &str;
         match open_ai_type {
@@ -28,26 +29,16 @@ impl OpenAI {
                 base_url = "https://api.openai.com/v1/embeddings";
             }
         }
+        let open_ai_token = vault_kv("open_ai_token");
+
         Ok(Self {
-            key: env::var("OPEN_API_KEY")?,
+            key: open_ai_token,
             client,
             base_url: base_url.to_string(),
         })
     }
 
-    async fn post<T: DeserializeOwned>(&self, body: Value) -> Result<T, BotError> {
-        // let response = self
-        //     .client
-        //     .post(&self.base_url)
-        //     .header("Content-Type", "application/json")
-        //     .header("Authorization", format!("Bearer {}", self.key))
-        //     .json(&body)
-        //     .send()
-        //     .await?;
-        // println!("{:?}", response.text().await.unwrap());
-        // /**
-        // Override here, we need to send not only completions but also embeddings and chat
-        // */
+    async fn post<T: DeserializeOwned>(&self, body: Value) -> Result<T> {
         let response = self
             .client
             .post(&self.base_url)
@@ -59,14 +50,14 @@ impl OpenAI {
         Ok(response.json::<T>().await?)
     }
 
-    fn parse_choice(chat_completion_response: &ChatCompletionResponse) -> Result<String, BotError> {
+    fn parse_choice(chat_completion_response: &ChatCompletionResponse) -> Result<String> {
         match chat_completion_response.choices.first() {
             Some(choice) => Ok(choice.message.content.to_string()),
             None => Err(io::Error::new(ErrorKind::InvalidData, "Choice not found").into()),
         }
     }
 
-    pub async fn send_user_message(&self, content: String) -> Result<String, BotError> {
+    pub async fn send_user_message(&self, content: String) -> Result<String> {
         let body = json!({
         "model": "gpt-4o",
         "store": true,
@@ -81,7 +72,7 @@ impl OpenAI {
         &self,
         user_message: &str,
         image: String,
-    ) -> Result<String, BotError> {
+    ) -> Result<String> {
         let base64img = format!("data:image/png;base64,{}", image);
         let body = json!({
             "model": "gpt-4o",
@@ -112,7 +103,7 @@ impl OpenAI {
         &self,
         sys_message: String,
         user_message: String,
-    ) -> Result<String, BotError> {
+    ) -> Result<String> {
         let body = json!({
         "model": "gpt-4o",
         "store": true,
@@ -129,7 +120,7 @@ impl OpenAI {
         sys_message: String,
         user_message: String,
         image: String,
-    ) -> Result<String, BotError> {
+    ) -> Result<String> {
         //todo create a func to convert
         let base64img = format!("data:image/png;base64,{}", image);
         let popusk_base64 = format!(
@@ -170,7 +161,7 @@ impl OpenAI {
         let response = self.post::<ChatCompletionResponse>(body).await?;
         Self::parse_choice(&response)
     }
-    pub async fn embeddings(&self, image_description: &str) -> Result<EmbeddingResponse, BotError> {
+    pub async fn embeddings(&self, image_description: &str) -> Result<EmbeddingResponse> {
         //todo check for self.client endpoint
         let body = json!({
         "model": "text-embedding-3-small",

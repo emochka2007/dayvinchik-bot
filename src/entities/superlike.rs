@@ -1,5 +1,6 @@
-use crate::common::{random_number, BotError};
+use crate::common::random_number;
 use crate::pg::pg::{DbQuery, PgClient};
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tokio_postgres::Row;
@@ -15,7 +16,7 @@ pub struct SuperLike {
 #[async_trait]
 impl DbQuery for SuperLike {
     const DB_NAME: &'static str = "superlikes";
-    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<(), BotError> {
+    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<()> {
         let query = "INSERT into superlikes\
          (id,\
          message, \
@@ -30,7 +31,7 @@ impl DbQuery for SuperLike {
         Ok(())
     }
 
-    fn from_sql(row: Row) -> Result<Self, BotError>
+    fn from_sql(row: Row) -> Result<Self>
     where
         Self: Sized,
     {

@@ -1,4 +1,4 @@
-use crate::common::{BotError, ChatId};
+use crate::common::ChatId;
 use crate::constants::VINCHIK_CHAT_INT;
 use crate::entities::chat_meta::ChatMeta;
 use crate::entities::profile_reviewer::ProcessingStatus;
@@ -11,6 +11,7 @@ use crate::prompts::Prompt;
 use crate::td::td_chats::td_get_chats;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
+use anyhow::Result;
 use async_trait::async_trait;
 use log::info;
 use tokio_postgres::Row;
@@ -32,7 +33,7 @@ pub struct ChatResponder {
 #[async_trait]
 impl DbQuery for ChatResponder {
     const DB_NAME: &'static str = "chat_responders";
-    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<(), BotError> {
+    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<()> {
         let query = "INSERT into chat_responders (\
         id,
         status,\
@@ -53,7 +54,7 @@ impl DbQuery for ChatResponder {
         Ok(())
     }
 
-    fn from_sql(row: Row) -> Result<Self, BotError>
+    fn from_sql(row: Row) -> Result<Self>
     where
         Self: Sized,
     {
@@ -75,7 +76,7 @@ impl DbStatusQuery for ChatResponder {
         &'a self,
         pg_client: &'a PgClient,
         status: Self::Status,
-    ) -> Result<(), BotError> {
+    ) -> Result<()> {
         let query = "UPDATE chat_responders SET status=$1 WHERE id=$2";
         pg_client
             .query(query, &[&status.to_str()?, &self.id])
@@ -83,10 +84,7 @@ impl DbStatusQuery for ChatResponder {
         Ok(())
     }
 
-    async fn get_by_status_one(
-        pg_client: &PgClient,
-        status: Self::Status,
-    ) -> Result<Option<Self>, BotError> {
+    async fn get_by_status_one(pg_client: &PgClient, status: Self::Status) -> Result<Option<Self>> {
         let query = "SELECT * from chat_responders WHERE status = $1 LIMIT 1";
         let row_opt = pg_client.query_opt(query, &[&status.to_str()?]).await?;
         match row_opt {
@@ -105,7 +103,7 @@ impl ChatResponder {
             msg_to: None,
         }
     }
-    pub async fn start(pg_client: &PgClient) -> Result<(), BotError> {
+    pub async fn start(pg_client: &PgClient) -> Result<()> {
         let chats = ChatMeta::get_all_unread(pg_client).await?;
         for chat in chats {
             if *chat.chat_id() != VINCHIK_CHAT_INT {
@@ -128,5 +126,5 @@ impl ChatResponder {
         }
         Ok(())
     }
-    // pub fn update_to(&self, to: &str) -> Result<(), BotError> {}
+    // pub fn update_to(&self, to: &str) -> Result<(), > {}
 }

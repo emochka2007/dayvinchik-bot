@@ -1,11 +1,10 @@
-use crate::common::BotError;
 use crate::prompts::Prompt;
+use anyhow::Result;
 use ollama_rs::generation::completion::request::GenerationRequest;
 use ollama_rs::generation::embeddings::request::{EmbeddingsInput, GenerateEmbeddingsRequest};
 use ollama_rs::generation::images::Image;
 use ollama_rs::Ollama;
 use pgvector::Vector;
-use std::fmt::format;
 
 pub struct OllamaVision {
     ollama: Ollama,
@@ -19,7 +18,7 @@ impl OllamaVision {
 
         Self { ollama, model }
     }
-    pub async fn get_image_embedding(&self, query: &str) -> Result<Vector, BotError> {
+    pub async fn get_image_embedding(&self, query: &str) -> Result<Vector> {
         let embed_input = EmbeddingsInput::from(query);
         let res = self
             .ollama
@@ -32,7 +31,7 @@ impl OllamaVision {
         Ok(Vector::from(float_embeddings.clone()))
     }
 
-    pub async fn describe_image(&self, bs64image: String) -> Result<String, BotError> {
+    pub async fn describe_image(&self, bs64image: String) -> Result<String> {
         let prompt = Prompt::image_description();
         let image = Image::from_base64(bs64image);
         let request = GenerationRequest::new(self.model.to_string(), prompt).add_image(image);

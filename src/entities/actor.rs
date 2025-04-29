@@ -1,8 +1,8 @@
-use crate::common::BotError;
 use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_reviewer::{ProcessingStatus, ProfileReviewer};
 use crate::pg::pg::{DbQuery, DbStatusQuery, PgClient};
 use crate::prompts::Prompt;
+use anyhow::Result;
 use log::{error, info};
 use std::time::Duration;
 use tokio::time::sleep;
@@ -40,7 +40,7 @@ impl Actor {
     }
 
     /// First we update the chat and only after update latest messages for dv bot
-    pub async fn analyze(&self, pg_client: &PgClient) -> Result<(), BotError> {
+    pub async fn analyze(&self, pg_client: &PgClient) -> Result<()> {
         info!("Analyzing...");
         DvBot::refresh(pg_client).await?;
         DvBot::read_last_message(pg_client).await?;

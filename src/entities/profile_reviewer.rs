@@ -1,4 +1,3 @@
-use crate::common::BotError;
 use crate::entities::dv_bot::DvBot;
 use crate::entities::task::Task;
 use crate::file::{file_exists, get_image_with_retries, move_file};
@@ -6,6 +5,7 @@ use crate::openapi::llm_api::{OpenAI, OpenAIType};
 use crate::pg::pg::{DbQuery, DbStatusQuery, PgClient};
 use crate::prompts::Prompt;
 use crate::td::td_file::td_file_download;
+use anyhow::Result;
 use async_trait::async_trait;
 use log::{debug, error, info};
 use std::error::Error;
@@ -27,7 +27,7 @@ pub enum ProcessingStatus {
 }
 //todo from str
 impl ProcessingStatus {
-    pub fn to_str(&self) -> Result<&str, BotError> {
+    pub fn to_str(&self) -> Result<&str> {
         match self {
             Self::Waiting => Ok("WAITING"),
             Self::Pending => Ok("PENDING"),
@@ -74,7 +74,7 @@ pub struct ProfileReviewer {
 #[async_trait]
 impl DbQuery for ProfileReviewer {
     const DB_NAME: &'static str = "profile_reviewers";
-    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<(), BotError> {
+    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<()> {
         let query = "INSERT into profile_reviewers (\
         chat_id, \
         text, \
@@ -89,7 +89,7 @@ impl DbQuery for ProfileReviewer {
         Ok(())
     }
 
-    fn from_sql(row: Row) -> Result<Self, BotError>
+    fn from_sql(row: Row) -> Result<Self>
     where
         Self: Sized,
     {
@@ -103,7 +103,7 @@ impl DbQuery for ProfileReviewer {
             updated_at: row.try_get("updated_at")?,
         })
     }
-    async fn clean_up(pg_client: &PgClient) -> Result<(), BotError> {
+    async fn clean_up(pg_client: &PgClient) -> Result<()> {
         let query = "UPDATE profile_reviewers SET status = $1";
         pg_client
             .query(query, &[&ProcessingStatus::Processed.to_str()?])
@@ -120,7 +120,7 @@ impl DbStatusQuery for ProfileReviewer {
         &'a self,
         pg_client: &'a PgClient,
         status: Self::Status,
-    ) -> Result<(), BotError> {
+    ) -> Result<()> {
         let query = "UPDATE profile_reviewers SET status=$1 WHERE id=$2";
         pg_client
             .query(query, &[&status.to_str()?, &self.id])
@@ -128,10 +128,7 @@ impl DbStatusQuery for ProfileReviewer {
         Ok(())
     }
 
-    async fn get_by_status_one(
-        pg_client: &PgClient,
-        status: Self::Status,
-    ) -> Result<Option<Self>, BotError> {
+    async fn get_by_status_one(pg_client: &PgClient, status: Self::Status) -> Result<Option<Self>> {
         let query = "SELECT * from profile_reviewers WHERE status = $1 LIMIT 1";
         let row_opt = pg_client.query_opt(query, &[&status.to_str()?]).await?;
         match row_opt {
@@ -175,7 +172,7 @@ impl ProfileReviewer {
         None
     }
 
-    pub async fn acquire(pg_client: &PgClient) -> Result<Option<()>, BotError> {
+    pub async fn acquire(pg_client: &PgClient) -> Result<Option<()>> {
         let query = "SELECT id from profile_reviewers WHERE status <> $1 \
         AND status <> $2";
         // If no running reviewers then we can run new profile_reviewer
@@ -195,7 +192,7 @@ impl ProfileReviewer {
     }
     /// Return waiting reviewer
     /// If no pending or in complete status return
-    pub async fn acquire_last_waiting(client: &PgClient) -> Result<Option<Self>, BotError> {
+    pub async fn acquire_last_waiting(client: &PgClient) -> Result<Option<Self>> {
         let query = "SELECT id from profile_reviewers WHERE status = $1 OR status = $2";
         // If no running reviewers then we can run new profile_reviewer
         let rows = client
@@ -213,7 +210,7 @@ impl ProfileReviewer {
         Self::get_by_status_one(client, ProcessingStatus::Waiting).await
     }
 
-    pub async fn finalize(&self, client: &PgClient, score: i32) -> Result<(), BotError> {
+    pub async fn finalize(&self, client: &PgClient, score: i32) -> Result<()> {
         let query = "UPDATE profile_reviewers SET \
         status=$1, \
         score=$2 \
@@ -230,16 +227,13 @@ impl ProfileReviewer {
     /// If there's a PENDING profile_reviewer -> return None
     /// If there's no WAITING profile_reviewer -> return None
     /// Returns profile_reviewer in COMPLETE status
-    pub async fn get_ready_to_proceed(client: &PgClient) -> Result<Option<Self>, BotError> {
+    pub async fn get_ready_to_proceed(client: &PgClient) -> Result<Option<Self>> {
         let completed_reviewer =
             Self::get_by_status_one(client, ProcessingStatus::Complete).await?;
         Ok(completed_reviewer)
     }
 
-    pub async fn review(
-        profile_reviewer: &ProfileReviewer,
-        pg_client: &PgClient,
-    ) -> Result<(), BotError> {
+    pub async fn review(profile_reviewer: &ProfileReviewer, pg_client: &PgClient) -> Result<()> {
         profile_reviewer
             .update_status(pg_client, ProcessingStatus::Pending)
             .await?;
@@ -272,7 +266,7 @@ impl ProfileReviewer {
         Ok(())
     }
 
-    pub async fn start(pg_client: &PgClient) -> Result<(), BotError> {
+    pub async fn start(pg_client: &PgClient) -> Result<()> {
         match ProfileReviewer::acquire_last_waiting(pg_client).await? {
             Some(profile_reviewer) => {
                 info!("Profile Reviewer is in progress...");
@@ -299,7 +293,7 @@ impl ProfileReviewer {
             None => Ok(()),
         }
     }
-    pub async fn is_reviewer_stuck(pg_client: &PgClient) -> Result<bool, BotError> {
+    pub async fn is_reviewer_stuck(pg_client: &PgClient) -> Result<bool> {
         let query = "SELECT * FROM profile_reviewers WHERE status <> 'PROCESSED' ORDER BY updated_at DESC LIMIT 1";
         let row_opt = pg_client.query_opt(query, &[]).await?;
         match row_opt {

@@ -1,9 +1,9 @@
-use crate::common::BotError;
 use crate::constants::update_last_request;
 use crate::pg::pg::{DbQuery, DbStatusQuery, PgClient};
 use crate::td::td_json::send;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
+use anyhow::{Error, Result};
 use async_trait::async_trait;
 use deadpool_postgres::GenericClient;
 use log::debug;
@@ -33,13 +33,13 @@ impl TaskStatus {
         }
     }
 
-    pub fn from_str(str: &str) -> Result<Self, BotError> {
+    pub fn from_str(str: &str) -> Result<Self> {
         let status = match str {
             "WAITING" => TaskStatus::Waiting,
             "PENDING" => TaskStatus::Pending,
             "COMPLETE" => TaskStatus::Complete,
             _ => {
-                return Err(BotError::from(io::Error::new(
+                return Err(Error::from(io::Error::new(
                     ErrorKind::InvalidData,
                     "Task status str not found",
                 )))
@@ -109,7 +109,7 @@ impl Task {
         request: RequestKeys,
         response: ResponseKeys,
         pg_client: &PgClient,
-    ) -> Result<Self, BotError> {
+    ) -> Result<Self> {
         let id = Uuid::new_v4();
         let task = Self {
             id,
@@ -125,7 +125,7 @@ impl Task {
         pg_client: &PgClient,
         last_td_lib_call: &RequestKeys,
         response_keys: &ResponseKeys,
-    ) -> Result<Option<Self>, BotError> {
+    ) -> Result<Option<Self>> {
         let query = "SELECT * from tasks WHERE request = $1 AND response = $2 ORDER BY created_at ASC LIMIT 1";
         let task_opt = pg_client
             .query_opt(
@@ -139,7 +139,7 @@ impl Task {
         }
     }
     /// Find `/start` task
-    pub async fn find_start(pg_client: &PgClient) -> Result<Option<()>, BotError> {
+    pub async fn find_start(pg_client: &PgClient) -> Result<Option<()>> {
         let query = "SELECT id FROM tasks WHERE status = 'WAITING' \n
         AND jsonb_extract_path_text(message::jsonb, 'input_message_content', 'text', 'text') = '/start';";
         let task_opt = pg_client.query_opt(query, &[]).await?;
@@ -157,7 +157,7 @@ impl TdManager {
         Self { client_id }
     }
 
-    pub async fn send_request(&self, pg_client: &PgClient) -> Result<(), BotError> {
+    pub async fn send_request(&self, pg_client: &PgClient) -> Result<()> {
         match Task::get_by_status_one(pg_client, TaskStatus::Waiting).await? {
             Some(task) => {
                 update_last_request(task.request)?;
@@ -176,7 +176,7 @@ impl TdManager {
 #[async_trait]
 impl DbQuery for Task {
     const DB_NAME: &'static str = "tasks";
-    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<(), BotError> {
+    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<()> {
         let query = "Insert into tasks \
         (id, message, status, response,request)
         VALUES
@@ -196,7 +196,7 @@ impl DbQuery for Task {
         Ok(())
     }
 
-    fn from_sql(row: Row) -> Result<Self, BotError>
+    fn from_sql(row: Row) -> Result<Self>
     where
         Self: Sized,
     {
@@ -208,7 +208,7 @@ impl DbQuery for Task {
             response: row.try_get("response")?,
         })
     }
-    async fn clean_up(pg_client: &PgClient) -> Result<(), BotError> {
+    async fn clean_up(pg_client: &PgClient) -> Result<()> {
         let query = "UPDATE tasks SET status = $1";
         pg_client
             .query(query, &[&TaskStatus::Complete.to_str()])
@@ -225,7 +225,7 @@ impl DbStatusQuery for Task {
         &'a self,
         pg_client: &'a PgClient,
         status: Self::Status,
-    ) -> Result<(), BotError> {
+    ) -> Result<()> {
         let query = "UPDATE tasks SET status = $1 \
         WHERE id = $2";
         pg_client
@@ -234,10 +234,7 @@ impl DbStatusQuery for Task {
         Ok(())
     }
 
-    async fn get_by_status_one(
-        pg_client: &PgClient,
-        status: Self::Status,
-    ) -> Result<Option<Self>, BotError>
+    async fn get_by_status_one(pg_client: &PgClient, status: Self::Status) -> Result<Option<Self>>
     where
         Self: Sized,
     {
