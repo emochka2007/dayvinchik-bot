@@ -1,4 +1,6 @@
-use crate::common::{BotError, ChatId, MessageId};
+use anyhow::Result;
+
+use crate::common::{ChatId, MessageId};
 use crate::entities::task::Task;
 use crate::pg::pg::{DbQuery, PgClient};
 use crate::td::td_message::match_message_content;
@@ -26,7 +28,7 @@ pub struct ChatMeta {
 #[async_trait]
 impl DbQuery for ChatMeta {
     const DB_NAME: &'static str = "chats";
-    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<(), BotError> {
+    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<()> {
         let query = "INSERT INTO chats (\
         id, \
         chat_id, \
@@ -53,7 +55,7 @@ impl DbQuery for ChatMeta {
         Ok(())
     }
 
-    fn from_sql(row: Row) -> Result<Self, BotError>
+    fn from_sql(row: Row) -> Result<Self>
     where
         Self: Sized,
     {
@@ -99,10 +101,7 @@ impl ChatMeta {
         }
     }
     /// Don't mix up with the trait which looks by UUID
-    pub async fn select_by_chat_id(
-        chat_id: i64,
-        client: &PgClient,
-    ) -> Result<Option<Self>, BotError> {
+    pub async fn select_by_chat_id(chat_id: i64, client: &PgClient) -> Result<Option<Self>> {
         let query = "SELECT * from chats WHERE chat_id = $1 LIMIT 1";
         let row_opt = client.query_opt(query, &[&chat_id]).await?;
         match row_opt {
@@ -111,7 +110,7 @@ impl ChatMeta {
         }
     }
 
-    pub async fn get_all_unread(pg_client: &PgClient) -> Result<Vec<Self>, BotError> {
+    pub async fn get_all_unread(pg_client: &PgClient) -> Result<Vec<Self>> {
         let mut chats: Vec<ChatMeta> = Vec::new();
         let query = "SELECT * from chats WHERE last_message_id > last_read_message_id";
         let rows = pg_client.query(query, &[]).await?;
@@ -122,7 +121,7 @@ impl ChatMeta {
     }
 }
 
-pub async fn td_chat_info(pg_client: &PgClient, chat_id: ChatId) -> Result<(), BotError> {
+pub async fn td_chat_info(pg_client: &PgClient, chat_id: ChatId) -> Result<()> {
     let message = TdGetChat::builder().chat_id(chat_id).build();
     let chat_history_msg = serde_json::to_string(&message)?;
     Task::new(
@@ -135,7 +134,7 @@ pub async fn td_chat_info(pg_client: &PgClient, chat_id: ChatId) -> Result<(), B
     Ok(())
 }
 //todo mb parser for all json struct
-pub async fn get_chat(json_str: Value, pg_client: &PgClient) -> Result<Option<ChatMeta>, BotError> {
+pub async fn get_chat(json_str: Value, pg_client: &PgClient) -> Result<Option<ChatMeta>> {
     let chat: Chat = serde_json::from_value(json_str)?;
     info!("Get chat");
     // if chat.id < 0 - it's a channel we cannot write to
@@ -165,7 +164,7 @@ pub async fn get_chat(json_str: Value, pg_client: &PgClient) -> Result<Option<Ch
     }
 }
 
-pub async fn td_open_chat(pg_client: &PgClient, chat_id: ChatId) -> Result<(), BotError> {
+pub async fn td_open_chat(pg_client: &PgClient, chat_id: ChatId) -> Result<()> {
     let message = OpenChat::builder().chat_id(chat_id).build();
     let chat_history_msg = serde_json::to_string(&message)?;
     Task::new(

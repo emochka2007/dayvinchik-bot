@@ -1,4 +1,3 @@
-#![feature(error_generic_member_access)]
 mod auth;
 mod common;
 mod constants;
@@ -16,9 +15,11 @@ mod pg;
 mod prompts;
 mod start_phrases;
 mod td;
+mod vault_deprecated;
 mod viuer;
 
-use crate::common::{env_init, BotError, MessageId};
+use crate::auth::qr_auth_init;
+use crate::common::{env_init, MessageId};
 use crate::cron::cron_manager;
 use crate::entities::actor::{Actor, ActorType};
 use crate::entities::chat_responder::ChatResponder;
@@ -37,21 +38,21 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 #[tokio::main]
-async fn main() -> Result<(), BotError> {
+async fn main() -> anyhow::Result<()> {
     info!("Start");
     env_init();
-    let client_id = new_client();
-    init_tdlib_params(client_id);
 
     let pool = PgConnect::create_pool_from_env()?;
     let client = pool.get().await?;
     PgConnect::run_migrations(&client).await?;
     PgConnect::clean_db(&client).await?;
+    let client_id = new_client();
+    init_tdlib_params(client_id)?;
 
     tokio::spawn(async move {
         loop {
             let msg = tokio::task::spawn_blocking(|| {
-                receive(1.5) // td_receive
+                receive(2.0) // td_receive
             })
             .await
             .unwrap_or_else(|e| {
@@ -60,17 +61,13 @@ async fn main() -> Result<(), BotError> {
             });
 
             if let Some(x) = msg {
-                debug!("X -> {x}");
+                // println!("X -> {x}");
                 parse_message(&client, &x)
                     .await
                     .unwrap_or_else(|e| error!("Parse message {:?}", e));
             }
         }
     });
-
-    // todo wait for register -> change to func state checker
-    // IF QR AUTH NEEDED
-    // qr_auth_init(client_id);
 
     if let Ok(client) = pool.get().await {
         tokio::spawn(async move {

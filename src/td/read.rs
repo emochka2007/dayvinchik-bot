@@ -1,4 +1,4 @@
-use crate::common::BotError;
+use crate::auth::qr_auth_init;
 use crate::constants::get_last_request;
 use crate::entities::chat_meta::{get_chat, td_chat_info};
 use crate::entities::task::{Task, TaskStatus};
@@ -7,11 +7,14 @@ use crate::pg::pg::{DbStatusQuery, PgClient};
 use crate::td::td_message::chat_history;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
+use anyhow::Result;
 use log::{debug, error, info};
 use rust_tdlib::types::{Chat, Chats, UpdateFile};
 use serde_json::Value;
+use std::time::Duration;
+use tokio::time::sleep;
 
-pub async fn parse_message(pg_client: &PgClient, json_str: &str) -> Result<(), BotError> {
+pub async fn parse_message(pg_client: &PgClient, json_str: &str) -> Result<()> {
     let json_value: Value = serde_json::from_str(json_str)?;
     debug!("Value: {:?}", json_value);
 
@@ -24,7 +27,7 @@ pub async fn parse_message(pg_client: &PgClient, json_str: &str) -> Result<(), B
     };
     if td_type == "error" {
         error!("Error td_lib in read {:?}", json_str);
-        panic!("read.rs error");
+        return Ok(());
     }
 
     let response_key = match ResponseKeys::from_str(td_type) {

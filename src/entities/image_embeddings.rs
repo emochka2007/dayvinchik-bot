@@ -1,15 +1,13 @@
-use crate::common::BotError;
-use crate::embeddings::ollama::OllamaVision;
 use crate::file::{image_to_base64, new_base64};
 use crate::openapi::llm_api::{OpenAI, OpenAIType};
 use crate::pg::pg::{DbQuery, PgClient};
 use crate::prompts::Prompt;
+use anyhow::Result;
 use async_trait::async_trait;
 use log::info;
 use pgvector::Vector;
 use std::fs;
 use tokio_postgres::Row;
-use viuer::ViuError::Image;
 
 pub struct ImageEmbeddings {
     embedding: Vector,
@@ -19,7 +17,7 @@ pub struct ImageEmbeddings {
 
 #[async_trait]
 impl DbQuery for ImageEmbeddings {
-    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<(), BotError> {
+    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<()> {
         pg_client
             .query(
                 "INSERT INTO \
@@ -31,7 +29,7 @@ impl DbQuery for ImageEmbeddings {
         Ok(())
     }
 
-    fn from_sql(row: Row) -> Result<Self, BotError>
+    fn from_sql(row: Row) -> Result<Self>
     where
         Self: Sized,
     {
@@ -50,13 +48,13 @@ impl ImageEmbeddings {
             image_path: image_path.to_string(),
         }
     }
-    pub async fn get_by_path(pg_client: &PgClient, path: String) -> Result<Option<Self>, BotError> {
+    pub async fn get_by_path(pg_client: &PgClient, path: String) -> Result<Option<Self>> {
         let query = "SELECT * from image_embeddings WHERE image_path = $1";
         let row = pg_client.query_opt(query, &[&path]).await?.unwrap();
         Ok(Some(Self::from_sql(row)?))
     }
 
-    pub async fn get_neighbor(pg_client: &PgClient, embedding: Vector) -> Result<(), BotError> {
+    pub async fn get_neighbor(pg_client: &PgClient, embedding: Vector) -> Result<()> {
         let row = pg_client
             .query_one(
                 "SELECT * FROM image_embeddings ORDER BY embedding <=> $1 LIMIT 1",
@@ -66,7 +64,7 @@ impl ImageEmbeddings {
         println!("{:?}", row);
         Ok(())
     }
-    pub async fn pick_and_store_reviewed_images(pg_client: &PgClient) -> Result<(), BotError> {
+    pub async fn pick_and_store_reviewed_images(pg_client: &PgClient) -> Result<()> {
         let paths = fs::read_dir("./alt_images")?;
         let chat_ai = OpenAI::new(OpenAIType::Chat)?;
         let embedding_ai = OpenAI::new(OpenAIType::Embedding)?;
@@ -91,7 +89,7 @@ impl ImageEmbeddings {
         Ok(())
     }
     // get score based on description "emo_girl"
-    pub async fn get_score_of_prompt(pg_client: &PgClient, prompt: &str) -> Result<i16, BotError> {
+    pub async fn get_score_of_prompt(pg_client: &PgClient, prompt: &str) -> Result<i16> {
         let embedding_ai = OpenAI::new(OpenAIType::Embedding)?;
         let response = embedding_ai.embeddings(prompt).await?;
         let query = "SELECT * FROM image_embeddings ORDER BY embedding <-> $1 LIMIT 5;";
@@ -104,7 +102,7 @@ impl ImageEmbeddings {
         Ok(1)
     }
 }
-pub async fn get_score_of_image(pg_client: &PgClient, path: &str) -> Result<i16, BotError> {
+pub async fn get_score_of_image(pg_client: &PgClient, path: &str) -> Result<i16> {
     let embedding = ImageEmbeddings::get_by_path(pg_client, path.to_string())
         .await?
         .unwrap();

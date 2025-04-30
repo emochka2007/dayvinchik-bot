@@ -1,9 +1,9 @@
-use crate::common::BotError;
 use crate::constants::VINCHIK_CHAT_INT;
 use crate::entities::chat_meta::ChatMeta;
 use crate::entities::profile_match::ProfileMatch;
 use crate::pg::pg::PgClient;
 use crate::td::td_message::{td_read_one_from_message_id, MessageMeta};
+use anyhow::Result;
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -11,14 +11,14 @@ use tokio::time::sleep;
 pub struct MatchAnalyzer {}
 
 impl MatchAnalyzer {
-    pub async fn start(pg_client: &PgClient) -> Result<(), BotError> {
+    pub async fn start(pg_client: &PgClient) -> Result<()> {
         Self::analyze_last_messages(pg_client, 1).await?;
         loop {
             Self::read_messages_from_db(pg_client).await?;
             sleep(Duration::from_secs(30)).await;
         }
     }
-    pub async fn analyze_last_messages(pg_client: &PgClient, limit: i32) -> Result<(), BotError> {
+    pub async fn analyze_last_messages(pg_client: &PgClient, limit: i32) -> Result<()> {
         let chat = ChatMeta::select_by_chat_id(VINCHIK_CHAT_INT, pg_client)
             .await?
             .unwrap();
@@ -29,7 +29,7 @@ impl MatchAnalyzer {
         }
         Ok(())
     }
-    pub async fn read_messages_from_db(pg_client: &PgClient) -> Result<(), BotError> {
+    pub async fn read_messages_from_db(pg_client: &PgClient) -> Result<()> {
         let all_messages = MessageMeta::get_all_unprocessed(pg_client).await?;
         for parsed_message in all_messages {
             // Match with url inside

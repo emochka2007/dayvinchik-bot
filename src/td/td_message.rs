@@ -1,4 +1,4 @@
-use crate::common::{BotError, ChatId, FileId, MessageId};
+use crate::common::{ChatId, FileId, MessageId};
 use crate::entities::dv_bot::DvBot;
 use crate::entities::profile_reviewer::{ProcessingStatus, ProfileReviewer};
 use crate::entities::superlike::SuperLike;
@@ -7,6 +7,7 @@ use crate::pg::pg::{DbQuery, PgClient};
 use crate::td::td_file::td_file_download;
 use crate::td::td_request::RequestKeys;
 use crate::td::td_response::ResponseKeys;
+use anyhow::Result;
 use async_trait::async_trait;
 use log::{debug, error};
 use rust_tdlib::types::{
@@ -31,7 +32,7 @@ pub struct MessageMeta {
 
 #[async_trait]
 impl DbQuery for MessageMeta {
-    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<(), BotError> {
+    async fn insert<'a>(&'a self, pg_client: &'a PgClient) -> Result<()> {
         let id = &Uuid::parse_str(&self.id).unwrap();
         let query = "INSERT INTO messages (\
         id, \
@@ -61,7 +62,7 @@ impl DbQuery for MessageMeta {
         Ok(())
     }
 
-    fn from_sql(row: Row) -> Result<Self, BotError>
+    fn from_sql(row: Row) -> Result<Self>
     where
         Self: Sized,
     {
@@ -80,7 +81,7 @@ impl DbQuery for MessageMeta {
 }
 
 impl MessageMeta {
-    pub fn from_message(msg: &Message) -> Result<Self, BotError> {
+    pub fn from_message(msg: &Message) -> Result<Self> {
         let is_read = true;
         let parsed_content = match_message_content(msg.content())?;
         Ok(Self {
@@ -118,7 +119,7 @@ impl MessageMeta {
     pub fn file_ids(&self) -> &Option<Vec<i32>> {
         &self.file_ids
     }
-    pub async fn get_all_unprocessed(pg_client: &PgClient) -> Result<Vec<Self>, BotError> {
+    pub async fn get_all_unprocessed(pg_client: &PgClient) -> Result<Vec<Self>> {
         let mut unprocessed_messages = Vec::new();
         let query = "SELECT * from messages WHERE processed <> true AND url IS NOT NULL ";
         let rows = pg_client.query(query, &[]).await?;
@@ -127,7 +128,7 @@ impl MessageMeta {
         }
         Ok(unprocessed_messages)
     }
-    pub async fn process(&self, pg_client: &PgClient) -> Result<(), BotError> {
+    pub async fn process(&self, pg_client: &PgClient) -> Result<()> {
         let query = "UPDATE messages SET processed = true WHERE id = $1";
         pg_client.query(query, &[&self.id]).await?;
         Ok(())
@@ -197,7 +198,7 @@ fn get_url_entity(entities: &Vec<TextEntity>, content: &mut ParseMessageContent)
 }
 
 //todo mb cache memory to skip processed_ids
-pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<(), BotError> {
+pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<()> {
     let messages: Messages = serde_json::from_value(json_str)?;
     debug!("messages {:?}", messages);
     for message in messages.messages() {
@@ -255,11 +256,7 @@ pub async fn chat_history(json_str: Value, pg_client: &PgClient) -> Result<(), B
     Ok(())
 }
 
-pub async fn td_get_last_message(
-    pg_client: &PgClient,
-    chat_id: ChatId,
-    limit: i32,
-) -> Result<(), BotError> {
+pub async fn td_get_last_message(pg_client: &PgClient, chat_id: ChatId, limit: i32) -> Result<()> {
     let history_message = GetChatHistory::builder()
         .chat_id(chat_id)
         .from_message_id(0)
@@ -280,7 +277,7 @@ pub async fn td_read_one_from_message_id(
     chat_id: ChatId,
     message_id: MessageId,
     offset: i32,
-) -> Result<(), BotError> {
+) -> Result<()> {
     let history_message = GetChatHistory::builder()
         .chat_id(chat_id)
         .from_message_id(0)
