@@ -2,6 +2,7 @@
 qr_code.png
 *.log
 /target
+/target
 .env
 
 # td can be installed by user

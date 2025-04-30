@@ -15,7 +15,7 @@ mod pg;
 mod prompts;
 mod start_phrases;
 mod td;
-mod vault;
+mod vault_deprecated;
 mod viuer;
 
 use crate::auth::qr_auth_init;
@@ -32,7 +32,6 @@ use crate::pg::pg::PgConnect;
 use crate::td::init_tdlib_params;
 use crate::td::read::parse_message;
 use crate::td::td_json::{new_client, receive};
-use crate::vault::{vault_data, vault_kv};
 use log::{debug, error, info};
 use std::env;
 use std::time::Duration;
@@ -48,13 +47,12 @@ async fn main() -> anyhow::Result<()> {
     PgConnect::run_migrations(&client).await?;
     PgConnect::clean_db(&client).await?;
     let client_id = new_client();
-    // init_tdlib_params(client_id)?;
-    // qr_auth_init(client_id);
+    init_tdlib_params(client_id)?;
 
     tokio::spawn(async move {
         loop {
             let msg = tokio::task::spawn_blocking(|| {
-                receive(1.5) // td_receive
+                receive(2.0) // td_receive
             })
             .await
             .unwrap_or_else(|e| {
@@ -63,7 +61,7 @@ async fn main() -> anyhow::Result<()> {
             });
 
             if let Some(x) = msg {
-                debug!("X -> {x}");
+                // println!("X -> {x}");
                 parse_message(&client, &x)
                     .await
                     .unwrap_or_else(|e| error!("Parse message {:?}", e));

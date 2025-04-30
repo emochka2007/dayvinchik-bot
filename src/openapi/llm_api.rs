@@ -1,6 +1,5 @@
 use crate::file::image_to_base64;
 use crate::openapi::openai::{ChatCompletionResponse, EmbeddingResponse};
-use crate::vault::vault_kv;
 use anyhow::Result;
 use reqwest::Client;
 use serde::de::DeserializeOwned;
@@ -29,7 +28,7 @@ impl OpenAI {
                 base_url = "https://api.openai.com/v1/embeddings";
             }
         }
-        let open_ai_token = vault_kv("open_ai_token");
+        let open_ai_token = env::var("OPEN_API_KEY")?;
 
         Ok(Self {
             key: open_ai_token,
@@ -125,7 +124,8 @@ impl OpenAI {
         let base64img = format!("data:image/png;base64,{}", image);
         let popusk_base64 = format!(
             "data:image/jpg;base64,{}",
-            image_to_base64("alt_images/popusk.jpg")?
+            //todo make generic
+            image_to_base64("alt_images/alt.jpg")?
         );
         let body = json!({
             "model": "gpt-4o",

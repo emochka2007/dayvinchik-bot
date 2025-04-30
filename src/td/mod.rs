@@ -1,6 +1,5 @@
 use crate::file::get_project_root;
 use crate::td::td_json::{send, ClientId};
-use crate::vault::vault_kv;
 use serde::Serialize;
 use serde_json::Value;
 use std::env;
@@ -36,21 +35,19 @@ pub struct TDLibParams {
 pub fn init_tdlib_params(client_id: ClientId) -> Result<()> {
     // use custom dir for storing artefacts that tdlib creates in dev
     let root = get_project_root()?;
-    let artefacts_dir = format!("{}/td/tdlib_artefacts", root.to_str().unwrap());
-    let tg_hash = vault_kv("tg_hash");
-    let tg_id = vault_kv("tg_id").parse::<i32>()?;
+    let artifacts = format!("{}/../td/tdlib_artefacts", root.to_str().unwrap());
 
     // set tdlib params
     let params = TDLibParams {
         use_test_dc: false,
-        database_directory: Some(artefacts_dir),
+        database_directory: Some(artifacts),
         files_directory: None,
         use_file_database: false,
         use_chat_info_database: true,
         use_message_database: true,
         use_secret_chats: false,
-        api_id: tg_id,
-        api_hash: tg_hash,
+        api_id: env::var("TD_API_ID")?.parse()?,
+        api_hash: env::var("TD_API_HASH")?,
         system_language_code: "en".to_string(),
         device_model: "MacBook Pro".to_string(),
         system_version: None,
