@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
 use std::fmt::Display;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
+use std::io::Write;
 use std::path::Path;
+use anyhow::Result;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct RawChat {
@@ -82,6 +84,27 @@ impl PrivateMessage {
     pub fn concat_text(&mut self, text: &str) {
         self.content = format!("{}\n{}", self.content, text);
     }
+}
+
+// Create jsonl file
+pub fn create_jsonl_file() -> Result<()> {
+    let private_dialogues = transform_private_messages();
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("people.jsonl")?;
+
+    for (i, d) in private_dialogues.iter().enumerate() {
+        let line = serde_json::to_string(d)?;
+        if i == private_dialogues.len() - 1 {
+            // Last element: write without newline
+            file.write_all(line.as_bytes())?;
+        } else {
+            // Other elements: write with newline
+            writeln!(file, "{}", line)?;
+        }
+    }
+    Ok(())
 }
 
 pub fn transform_private_messages() -> Vec<PrivateDialogue> {

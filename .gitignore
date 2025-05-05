@@ -1,5 +1,6 @@
 .idea
 qr_code.png
+Zig.iml
 *.log
 /target
 .env

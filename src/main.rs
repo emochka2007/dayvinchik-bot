@@ -40,6 +40,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::time::Duration;
 use tokio::time::sleep;
+use crate::openapi::fine_tuning::FineTuningOpenAI;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -56,23 +57,10 @@ async fn main() -> anyhow::Result<()> {
         .await
         .unwrap_or_else(|e| panic!("Couldn't get the client from pool {:?}", e));
 
-    let private_dialogues = transform_private_messages();
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("people.jsonl")?;
 
-    for (i, d) in private_dialogues.iter().enumerate() {
-        let line = serde_json::to_string(d)?;
-        if i == private_dialogues.len() - 1 {
-            // Last element: write without newline
-            file.write_all(line.as_bytes())?;
-        } else {
-            // Other elements: write with newline
-            writeln!(file, "{}", line)?;
-        }
-    }
-
+    let fine_tuning = FineTuningOpenAI::new()?;
+    let response = fine_tuning.send("input").await?;
+    println!("{:?}", response);
     return Ok(());
     let client_id = new_client();
     init_tdlib_params(client_id)?;
