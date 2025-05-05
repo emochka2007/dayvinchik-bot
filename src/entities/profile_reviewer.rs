@@ -317,7 +317,7 @@ impl ProfileReviewer {
                 match last_processed {
                     Some(row) => {
                         let now = SystemTime::now();
-                        let time_passed = now.duration_since(row.updated_at).unwrap();
+                        let time_passed = now.duration_since(row.updated_at)?;
                         info!(
                             "Time passed since last_processed profile_reviewer {:}",
                             time_passed.as_secs()

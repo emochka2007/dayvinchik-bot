@@ -1,4 +1,4 @@
-use crate::file::{image_to_base64, new_base64};
+use crate::file::new_base64;
 use crate::openapi::llm_api::{OpenAI, OpenAIType};
 use crate::pg::pg::{DbQuery, PgClient};
 use crate::prompts::Prompt;
@@ -48,6 +48,7 @@ impl ImageEmbeddings {
             image_path: image_path.to_string(),
         }
     }
+
     pub async fn get_by_path(pg_client: &PgClient, path: String) -> Result<Option<Self>> {
         let query = "SELECT * from image_embeddings WHERE image_path = $1";
         let row = pg_client.query_opt(query, &[&path]).await?.unwrap();
@@ -64,6 +65,7 @@ impl ImageEmbeddings {
         println!("{:?}", row);
         Ok(())
     }
+
     pub async fn pick_and_store_reviewed_images(pg_client: &PgClient) -> Result<()> {
         let paths = fs::read_dir("./alt_images")?;
         let chat_ai = OpenAI::new(OpenAIType::Chat)?;
@@ -77,7 +79,7 @@ impl ImageEmbeddings {
             let description = chat_ai
                 .send_image_with_prompt(&prompt, image_encoded)
                 .await?;
-            let response = embedding_ai.embeddings(&description).await.unwrap();
+            let response = embedding_ai.embeddings(&description).await?;
             ImageEmbeddings::new(
                 response.data.first().unwrap().embedding.clone().into(),
                 &description,

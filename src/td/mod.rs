@@ -12,6 +12,7 @@ pub mod td_json;
 pub mod td_message;
 pub mod td_request;
 pub mod td_response;
+pub mod td_socket;
 use anyhow::Result;
 
 #[derive(Serialize)]

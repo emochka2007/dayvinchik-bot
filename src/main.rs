@@ -1,4 +1,5 @@
 mod auth;
+mod autoresponder;
 mod common;
 mod constants;
 mod cron;
@@ -18,8 +19,8 @@ mod td;
 mod vault_deprecated;
 mod viuer;
 
-use crate::auth::qr_auth_init;
-use crate::common::{env_init, MessageId};
+use crate::autoresponder::transform_private_messages;
+use crate::common::env_init;
 use crate::cron::cron_manager;
 use crate::entities::actor::{Actor, ActorType};
 use crate::entities::chat_responder::ChatResponder;
@@ -30,10 +31,13 @@ use crate::input::match_input;
 use crate::matches::MatchAnalyzer;
 use crate::pg::pg::PgConnect;
 use crate::td::init_tdlib_params;
-use crate::td::read::parse_message;
-use crate::td::td_json::{new_client, receive};
+use crate::td::td_json::new_client;
+use crate::td::td_socket::start_td_socket;
 use log::{debug, error, info};
+use serde_json::json;
 use std::env;
+use std::fs::{File, OpenOptions};
+use std::io::{Read, Write};
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -46,27 +50,35 @@ async fn main() -> anyhow::Result<()> {
     let client = pool.get().await?;
     PgConnect::run_migrations(&client).await?;
     PgConnect::clean_db(&client).await?;
+
+    let client = pool
+        .get()
+        .await
+        .unwrap_or_else(|e| panic!("Couldn't get the client from pool {:?}", e));
+
+    let private_dialogues = transform_private_messages();
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("people.jsonl")?;
+
+    for (i, d) in private_dialogues.iter().enumerate() {
+        let line = serde_json::to_string(d)?;
+        if i == private_dialogues.len() - 1 {
+            // Last element: write without newline
+            file.write_all(line.as_bytes())?;
+        } else {
+            // Other elements: write with newline
+            writeln!(file, "{}", line)?;
+        }
+    }
+
+    return Ok(());
     let client_id = new_client();
     init_tdlib_params(client_id)?;
 
     tokio::spawn(async move {
-        loop {
-            let msg = tokio::task::spawn_blocking(|| {
-                receive(2.0) // td_receive
-            })
-            .await
-            .unwrap_or_else(|e| {
-                error!("{:?}", e);
-                panic!("Tokio task spawn blocking");
-            });
-
-            if let Some(x) = msg {
-                // println!("X -> {x}");
-                parse_message(&client, &x)
-                    .await
-                    .unwrap_or_else(|e| error!("Parse message {:?}", e));
-            }
-        }
+        start_td_socket(client).await;
     });
 
     if let Ok(client) = pool.get().await {
@@ -74,10 +86,6 @@ async fn main() -> anyhow::Result<()> {
             cron_manager(client_id, &client).await;
         });
     }
-    let client = pool
-        .get()
-        .await
-        .unwrap_or_else(|e| panic!("Couldn't get the client from pool {:?}", e));
 
     tokio::spawn(async move {
         Actor::new(ActorType::Default, 50)
@@ -135,8 +143,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }
     let mode = env::var("MODE")?;
-    if mode == "CRON" {
-    } else {
+    if mode == "CRON" {} else {
         loop {
             if let Ok(input) = input() {
                 if let Ok(client) = pool.get().await {
