@@ -1,30 +1,14 @@
 use std::env;
 use reqwest::Client;
 use serde_json::json;
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
+use anyhow::{anyhow, Result};
+use crate::openapi::openai::FineTuningResponse;
 
 pub struct FineTuningOpenAI {
     key: String,
     model_name: String,
     client: Client,
     base_url: String,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct FineTunedResponseOutput {
-    id: String,
-    r#type: String,
-    status: String,
-    content: Vec<FineTunedResponseOutputContent>,
-    role: String,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct FineTunedResponseOutputContent {
-    r#type: String,
-    annotations: Vec<String>,
-    text: String,
 }
 
 
@@ -43,7 +27,7 @@ impl FineTuningOpenAI {
         })
     }
 
-    pub async fn send(&self, input: &str) -> Result<FineTunedResponseOutput> {
+    pub async fn send(&self, input: &str) -> Result<FineTuningResponse> {
         let body = json!({
             "model": self.model_name,
             "input": input,
@@ -68,7 +52,13 @@ impl FineTuningOpenAI {
             .json(&body)
             .send()
             .await?;
-        // Ok(response.json::<FineTunedResponseOutput>().await?)
-        Ok(response.json::<FineTunedResponseOutput>().await?)
+        Ok(response.json::<FineTuningResponse>().await?)
+    }
+
+    pub async fn get_assistant_response(&self, input: &str) -> Result<String> {
+        let response = self.send(input).await?;
+        let output = response.output.first().ok_or(anyhow!("Output not found"))?;
+        let content = output.content.first().ok_or(anyhow!("Output not found"))?;
+        Ok(content.text.clone())
     }
 }

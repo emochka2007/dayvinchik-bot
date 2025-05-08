@@ -54,8 +54,7 @@ impl FromSql<'_> for ResponseKeys {
         }
     }
 
-    //todo fix type
-    fn accepts(ty: &Type) -> bool {
+    fn accepts(_ty: &Type) -> bool {
         true
     }
 }

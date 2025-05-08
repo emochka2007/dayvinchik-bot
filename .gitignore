@@ -5,10 +5,6 @@ Zig.iml
 /target
 .env
 
-# td can be installed by user
-# see: https://core.telegram.org/tdlib/docs/
-td
-
 # dir used in tdlib setup params
 /tdlib_artefacts
 

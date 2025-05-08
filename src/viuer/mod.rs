@@ -1,6 +1,6 @@
 use viuer::{is_iterm_supported, terminal_size};
 
-pub fn display_image_in_terminal(path: &str) {
+pub fn _display_image_in_terminal(path: &str) {
     if !is_iterm_supported() {
         panic!("Display is not supported not in iterm");
     }

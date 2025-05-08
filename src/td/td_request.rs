@@ -26,7 +26,7 @@ impl RequestKeys {
             RequestKeys::OpenChat => "openChat",
         }
     }
-    pub fn from_str(data: &str) -> io::Result<Self> {
+    pub fn _from_str(data: &str) -> io::Result<Self> {
         match data {
             "getChatHistory" => Ok(RequestKeys::GetChatHistory),
             "downloadFile" => Ok(RequestKeys::DownloadFile),

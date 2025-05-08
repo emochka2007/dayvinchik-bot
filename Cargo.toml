@@ -27,8 +27,10 @@ rand = "0.9.0"
 ollama-rs = "0.2.6"
 pgvector = { version = "0.4", features = ["postgres"] }
 viuer = { version = "0.9.1", features = ["print-file"] }
-rusty_vault = "0.2.1"
 anyhow = "1.0.97"
+clap = { version = "4.5.37", features = ["cargo"] }
+colored = "3.0.0"
+chrono = "0.4.39"
 
 [dev-dependencies]
 console-subscriber = "0.4.1"

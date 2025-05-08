@@ -1,36 +1,16 @@
+use chrono::Local;
 use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
+use std::env;
 use std::fmt::Display;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 use anyhow::Result;
+use crate::autoresponder::types::{ExportedChat, TextOrTextList};
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct RawChat {
-    name: String,
-    r#type: String,
-    id: u32,
-    messages: Vec<RawMessage>,
-}
+mod types;
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct RawMessage {
-    id: i32,
-    r#type: String,
-    date: String,
-    date_unixtime: String,
-    from: String,
-    from_id: String,
-    text: String,
-    text_entities: Vec<RawTextEntity>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct RawTextEntity {
-    r#type: String,
-    text: String,
-}
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct PrivateDialogue {
@@ -43,18 +23,35 @@ impl PrivateDialogue {
     }
 
     pub fn get_last_message(&mut self) -> Option<&mut PrivateMessage> {
-        let last = self.messages.last_mut();
-        match last {
-            Some(last) => Some(last),
-            None => None,
-        }
+        self.messages.last_mut()
     }
-}
-
-impl PrivateDialogue {
     fn new() -> Self {
         Self {
             messages: Vec::new(),
+        }
+    }
+    fn check_for_last_message(&mut self) -> anyhow::Result<()> {
+        let last = self.get_last_message();
+        let last = match last {
+            Some(last) => last,
+            None => {
+                return Ok(());
+            }
+        };
+        // Check if last message is being sent out by assistant
+        match last.role.as_str() {
+            "assistant" => {
+                // do nothing
+                Ok(())
+            }
+            _ => {
+                let private_message = PrivateMessage {
+                    content: "".to_string(),
+                    role: "assistant".to_string(),
+                };
+                self.add_private_message(private_message);
+                Ok(())
+            }
         }
     }
 }
@@ -81,18 +78,28 @@ impl Display for PrivateMessageRole {
 }
 
 impl PrivateMessage {
-    pub fn concat_text(&mut self, text: &str) {
-        self.content = format!("{}\n{}", self.content, text);
+    pub fn concat_text(&mut self, text: &TextOrTextList) {
+        match text {
+            TextOrTextList::Single(single) => {
+                self.content = format!("{}\n{}", self.content, single);
+            }
+            TextOrTextList::List(list) => {
+                self.content = format!("{}\n{:?}", self.content, list);
+            }
+        }
     }
 }
 
 // Create jsonl file
-pub fn create_jsonl_file() -> Result<()> {
-    let private_dialogues = transform_private_messages();
+pub fn create_jsonl_file(path: &str) -> Result<()> {
+    let private_dialogues = transform_private_messages(path);
+
+    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+    let file_name = format!("parsed_jsonl/{}.jsonl", timestamp);
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("people.jsonl")?;
+        .open(file_name)?;
 
     for (i, d) in private_dialogues.iter().enumerate() {
         let line = serde_json::to_string(d)?;
@@ -107,31 +114,35 @@ pub fn create_jsonl_file() -> Result<()> {
     Ok(())
 }
 
-pub fn transform_private_messages() -> Vec<PrivateDialogue> {
-    let json_file_path = Path::new("example.json");
+pub fn transform_private_messages(path: &str) -> Vec<PrivateDialogue> {
+    let json_file_path = Path::new(path);
     let file = File::open(json_file_path).unwrap();
-    let chat: RawChat = serde_json::from_reader(file).unwrap();
+    println!("json -> {:?}", json_file_path);
+    let chat: ExportedChat = serde_json::from_reader(file).unwrap();
     println!("Chat -> {:?}", chat);
     let mut dialogues: Vec<PrivateDialogue> = Vec::new();
+    let assistant_name = env::var("TG_USERNAME").unwrap();
     for _ in 1..=10 {
         let mut dialogue = PrivateDialogue::new();
         for message in &chat.messages {
             // Sort messages by time for a single dialogue
-            let role = match message.from.as_str() {
-                "Maxim" => "assistant".to_string(),
-                _ => "user".to_string(),
+            let role = match &message.from {
+                Some(from_name) if from_name == &assistant_name => "assistant".to_string(),
+                Some(_) => "user".to_string(),
+                None => continue,
             };
             let last_message = dialogue.get_last_message();
+            let text = &message.text.to_string();
             match last_message {
                 Some(last) => {
                     // Check role
                     match last.role == role {
                         true => {
-                            &last.concat_text(&message.text);
+                            last.concat_text(&message.text);
                         }
                         false => {
                             dialogue.add_private_message(PrivateMessage {
-                                content: message.text.to_string(),
+                                content: text.clone(),
                                 role,
                             });
                         }
@@ -139,12 +150,13 @@ pub fn transform_private_messages() -> Vec<PrivateDialogue> {
                 }
                 None => {
                     dialogue.add_private_message(PrivateMessage {
-                        content: message.text.to_string(),
+                        content: text.clone(),
                         role,
                     });
                 }
             }
         }
+        dialogue.check_for_last_message().expect("todo error");
         dialogues.push(dialogue)
     }
     dialogues

@@ -1,4 +1,3 @@
-use crate::auth::qr_auth_init;
 use anyhow::Result;
 use image::Luma;
 use qrcode::QrCode;
