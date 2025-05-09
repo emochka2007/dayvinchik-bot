@@ -1,4 +1,3 @@
-use crate::auth::qr_auth_init;
 use crate::constants::get_last_request;
 use crate::entities::chat_meta::{get_chat, td_chat_info};
 use crate::entities::task::{Task, TaskStatus};
@@ -11,8 +10,6 @@ use anyhow::Result;
 use log::{debug, error, info};
 use rust_tdlib::types::{Chat, Chats, UpdateFile};
 use serde_json::Value;
-use std::time::Duration;
-use tokio::time::sleep;
 
 pub async fn parse_message(pg_client: &PgClient, json_str: &str) -> Result<()> {
     let json_value: Value = serde_json::from_str(json_str)?;
@@ -52,6 +49,7 @@ pub async fn parse_message(pg_client: &PgClient, json_str: &str) -> Result<()> {
     if task.is_none() {
         return Ok(());
     }
+
     //todo mb fix
     let task = task.unwrap();
     if *task.request() == last_tdlib_call && *task.response() == response_key {
