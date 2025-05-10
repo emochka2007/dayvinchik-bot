@@ -2,8 +2,9 @@ use std::{fs, io};
 use std::io::Write;
 use clap::{arg, command};
 use colored::Colorize;
-use log::info;
+use log::{error, info};
 use crate::autoresponder::{create_jsonl_file};
+use crate::openapi::fine_tuning::FineTuningOpenAI;
 
 pub fn is_cli_mode() -> bool {
     let matches = command!().arg(arg!([cli])).get_matches();
@@ -13,7 +14,7 @@ pub fn is_cli_mode() -> bool {
     false
 }
 
-pub fn start_cli() -> anyhow::Result<()> {
+pub async fn start_cli() -> anyhow::Result<()> {
     loop {
         print!("{}",
                "\r --- Choose an option ---\n 1. Transform chats\n 2. ---\n".magenta()
@@ -42,10 +43,25 @@ pub fn start_cli() -> anyhow::Result<()> {
                 info!("Successfully parsed all files");
                 return Ok(());
             }
-            "2" => {}
+            "2" => {
+                print!("{}", "Enter your prompt: \n".yellow());
+                read_prompt_input().await?;
+            }
             _ => {
-                println!("Invalid choice, please try again.");
+                error!("Invalid choice, please try again.");
             }
         }
+    }
+}
+async fn read_prompt_input() -> anyhow::Result<()> {
+    loop {
+        let mut menu_option_input = String::new();
+        io::stdin()
+            .read_line(&mut menu_option_input)
+            .expect("Failed to read input");
+        let fine_tuned_model = FineTuningOpenAI::new()?;
+        info!("menu: {:?}", menu_option_input);
+        let response = fine_tuned_model.send(menu_option_input.as_str()).await?;
+        info!("Response text: {:?}", response);
     }
 }

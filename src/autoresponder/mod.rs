@@ -117,9 +117,7 @@ pub fn create_jsonl_file(path: &str) -> Result<()> {
 pub fn transform_private_messages(path: &str) -> Vec<PrivateDialogue> {
     let json_file_path = Path::new(path);
     let file = File::open(json_file_path).unwrap();
-    println!("json -> {:?}", json_file_path);
     let chat: ExportedChat = serde_json::from_reader(file).unwrap();
-    println!("Chat -> {:?}", chat);
     let mut dialogues: Vec<PrivateDialogue> = Vec::new();
     let assistant_name = env::var("TG_USERNAME").unwrap();
     for _ in 1..=10 {
