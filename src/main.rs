@@ -54,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
     let is_cli_mode = is_cli_mode();
     if is_cli_mode {
         info!("Start in cli mode");
-        return start_cli();
+        return start_cli().await;
     } else {
         // Telegram connect
         let client_id = new_client();

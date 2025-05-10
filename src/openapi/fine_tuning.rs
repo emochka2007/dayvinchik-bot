@@ -14,7 +14,7 @@ pub struct FineTuningOpenAI {
 
 impl FineTuningOpenAI {
     pub fn new() -> Result<Self> {
-        let model_name = "ft:gpt-4.1-mini-2025-04-14:personal:emochka007:BTeZ9uCW:ckpt-step-20".to_string();
+        let model_name = env::var("OUTPUT_MODEL_OPENAI")?.to_string();
         let client = Client::new();
         let base_url: &str = "https://api.openai.com/v1/responses";
         let open_ai_token = env::var("OPEN_API_KEY")?;

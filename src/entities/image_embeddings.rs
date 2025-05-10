@@ -62,7 +62,6 @@ impl ImageEmbeddings {
                 &[&embedding],
             )
             .await?;
-        println!("{:?}", row);
         Ok(())
     }
 
@@ -85,8 +84,8 @@ impl ImageEmbeddings {
                 &description,
                 file_name_str,
             )
-            .insert(pg_client)
-            .await?;
+                .insert(pg_client)
+                .await?;
         }
         Ok(())
     }
